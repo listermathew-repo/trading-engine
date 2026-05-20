@@ -1,10 +1,20 @@
 import os
+import sys
 import requests
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from typing import Optional
 from dotenv import load_dotenv
-from capital_client import CapitalClient, TradeResult
+
+# Add current directory to path for imports
+sys.path.insert(0, os.path.dirname(__file__))
+
+try:
+    from capital_client import CapitalClient, TradeResult
+except ImportError as e:
+    print(f"Warning: Could not import CapitalClient: {e}")
+    CapitalClient = None
+    TradeResult = None
 
 load_dotenv()
 
@@ -46,7 +56,18 @@ async def receive_webhook(payload: WebhookPayload):
     stop_price = float(payload.stop) if payload.stop else None
 
     if SIMULATE:
-        result = TradeResult(
+        # Create a simple result object for simulation mode
+        from dataclasses import dataclass
+        @dataclass
+        class SimpleResult:
+            success: bool
+            deal_reference: str
+            size: float
+            direction: str
+            epic: str
+            message: str
+
+        result = SimpleResult(
             success=True,
             deal_reference="SIM-001",
             size=1.0,
@@ -55,6 +76,8 @@ async def receive_webhook(payload: WebhookPayload):
             message=f"[SIMULATED] {payload.action.upper()} {payload.symbol} @ {entry_price}",
         )
     else:
+        if CapitalClient is None:
+            raise HTTPException(status_code=500, detail="CapitalClient not available")
         client = CapitalClient()
         result = client.place_market_order(
             symbol=payload.symbol,
