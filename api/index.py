@@ -64,12 +64,12 @@ def send_ntfy_notification(message: str, title: str = "", priority: str = "defau
 
 
 @app.get("/")
-def health():
+def health() -> dict:
     return {"status": "ok", "simulate": SIMULATE, "ntfy_topic": NTFY_TOPIC}
 
 
 @app.post("/webhook")
-async def receive_webhook(payload: WebhookPayload):
+async def receive_webhook(payload: WebhookPayload) -> dict:
     entry_price = float(payload.price)
     stop_price = float(payload.stop) if payload.stop else None
 
