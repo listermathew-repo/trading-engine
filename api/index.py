@@ -36,16 +36,31 @@ class WebhookPayload(BaseModel):
     stop: Optional[str] = None  # stop-loss price level (optional but needed for correct sizing)
 
 
-def send_ntfy_notification(message: str, title: str = "", priority: str = "default") -> None:
+def send_ntfy_notification(message: str, title: str = "", priority: str = "default") -> dict:
+    """Send notification to ntfy.sh and return result"""
     try:
-        requests.post(
+        print(f"[NTFY] Sending to {NTFY_URL}")
+        print(f"[NTFY] Title: {title}")
+        print(f"[NTFY] Message: {message[:100]}...")
+
+        response = requests.post(
             NTFY_URL,
             data=message.encode(),
             headers={"Title": title, "Priority": priority},
             timeout=5,
         )
-    except Exception:
-        pass
+
+        print(f"[NTFY] Status: {response.status_code}")
+        print(f"[NTFY] Response: {response.text}")
+
+        if response.status_code == 200:
+            return {"success": True, "message": "Notification sent"}
+        else:
+            return {"success": False, "message": f"HTTP {response.status_code}"}
+
+    except Exception as e:
+        print(f"[NTFY] ERROR: {str(e)}")
+        return {"success": False, "message": str(e)}
 
 
 @app.get("/")
@@ -101,7 +116,7 @@ async def receive_webhook(payload: WebhookPayload):
         f"{result.message}"
     )
 
-    send_ntfy_notification(
+    ntfy_result = send_ntfy_notification(
         message=ntfy_body,
         title=f"{sim_tag}{payload.action.upper()} {payload.symbol} @ {entry_price:.2f} — {status}",
         priority="high" if result.success else "urgent",
@@ -110,4 +125,9 @@ async def receive_webhook(payload: WebhookPayload):
     if not result.success:
         raise HTTPException(status_code=500, detail=result.message)
 
-    return {"status": "ok", "simulate": SIMULATE, "result": result.message}
+    return {
+        "status": "ok",
+        "simulate": SIMULATE,
+        "result": result.message,
+        "ntfy": ntfy_result
+    }
