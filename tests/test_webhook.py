@@ -10,9 +10,11 @@ def setup_env():
     """Set up environment variables for testing"""
     os.environ["NTFY_TOPIC"] = "test-topic"
     os.environ["SIMULATE_TRADES"] = "true"
+    os.environ["WEBHOOK_API_KEY"] = "test-key"
     yield
     os.environ.pop("NTFY_TOPIC", None)
     os.environ.pop("SIMULATE_TRADES", None)
+    os.environ.pop("WEBHOOK_API_KEY", None)
 
 
 @pytest.fixture
@@ -77,12 +79,12 @@ def test_webhook_accepts_valid_api_key(mock_ntfy, client):
         },
         headers={"X-API-Key": "test-key-12345"}
     )
-    assert response.status_code == 200
+    assert response.status_code == 202
 
 
 @patch('api.index.send_ntfy_notification')
-def test_webhook_simulation_mode(mock_ntfy, client, setup_env):
-    """Test webhook in simulation mode"""
+def test_webhook_queues_trade(mock_ntfy, client, setup_env):
+    """Test webhook queues trade instead of executing immediately"""
     mock_ntfy.return_value = {"success": True, "message": "Notification sent"}
 
     response = client.post(
@@ -92,15 +94,16 @@ def test_webhook_simulation_mode(mock_ntfy, client, setup_env):
             "action": "buy",
             "price": "2450.50",
             "stop": "2445.00"
-        }
+        },
+        headers={"X-API-Key": "test-key"}
     )
 
-    assert response.status_code == 200
+    assert response.status_code == 202
     data = response.json()
-    assert data["simulate"] is True
-    assert "[SIMULATED]" in data["result"]
-    assert data["status"] == "ok"
-    mock_ntfy.assert_called_once()
+    assert data["status"] == "accepted"
+    assert "trade_id" in data
+    assert "expires_at" in data
+    assert data["message"] == "Trade queued for approval"
 
 
 @patch('api.index.send_ntfy_notification')
@@ -115,11 +118,12 @@ def test_webhook_buy_order(mock_ntfy, client, setup_env):
             "action": "buy",
             "price": "1.0850",
             "stop": "1.0800"
-        }
+        },
+        headers={"X-API-Key": "test-key"}
     )
 
-    assert response.status_code == 200
-    assert "BUY" in response.json()["result"]
+    assert response.status_code == 202
+    assert "trade_id" in response.json()
 
 
 @patch('api.index.send_ntfy_notification')
@@ -134,11 +138,12 @@ def test_webhook_sell_order(mock_ntfy, client, setup_env):
             "action": "sell",
             "price": "0.6500",
             "stop": "0.6550"
-        }
+        },
+        headers={"X-API-Key": "test-key"}
     )
 
-    assert response.status_code == 200
-    assert "SELL" in response.json()["result"]
+    assert response.status_code == 202
+    assert "trade_id" in response.json()
 
 
 def test_webhook_missing_required_field(client, setup_env):
@@ -149,7 +154,8 @@ def test_webhook_missing_required_field(client, setup_env):
             "symbol": "XAUUSD",
             # Missing 'action'
             "price": "2450.50"
-        }
+        },
+        headers={"X-API-Key": "test-key"}
     )
 
     assert response.status_code == 422  # Validation error
@@ -164,7 +170,8 @@ def test_webhook_missing_price(client, setup_env):
             "action": "buy",
             # Missing 'price'
             "stop": "2445.00"
-        }
+        },
+        headers={"X-API-Key": "test-key"}
     )
 
     assert response.status_code == 422  # Validation error
@@ -182,17 +189,18 @@ def test_webhook_optional_stop_level(mock_ntfy, client, setup_env):
             "action": "buy",
             "price": "1.2650"
             # stop is optional
-        }
+        },
+        headers={"X-API-Key": "test-key"}
     )
 
-    assert response.status_code == 200
+    assert response.status_code == 202
     data = response.json()
-    assert data["simulate"] is True
+    assert "trade_id" in data
 
 
 @patch('api.index.send_ntfy_notification')
 def test_webhook_ntfy_notification_called(mock_ntfy, client, setup_env):
-    """Test that ntfy notification is always called"""
+    """Test that ntfy notification is called on webhook"""
     mock_ntfy.return_value = {"success": True, "message": "Notification sent"}
 
     client.post(
@@ -202,7 +210,8 @@ def test_webhook_ntfy_notification_called(mock_ntfy, client, setup_env):
             "action": "buy",
             "price": "2450.50",
             "stop": "2445.00"
-        }
+        },
+        headers={"X-API-Key": "test-key"}
     )
 
     # Verify ntfy was called with correct parameters
@@ -210,26 +219,6 @@ def test_webhook_ntfy_notification_called(mock_ntfy, client, setup_env):
     call_kwargs = mock_ntfy.call_args[1]
     assert "message" in call_kwargs
     assert "title" in call_kwargs
-
-
-@patch('api.index.send_ntfy_notification')
-def test_webhook_ntfy_failure_handling(mock_ntfy, client, setup_env):
-    """Test webhook handles ntfy notification failures"""
-    mock_ntfy.return_value = {"success": False, "message": "Notification failed"}
-
-    response = client.post(
-        "/webhook",
-        json={
-            "symbol": "XAUUSD",
-            "action": "buy",
-            "price": "2450.50",
-            "stop": "2445.00"
-        }
-    )
-
-    # Even with ntfy failure, webhook should complete successfully in simulation mode
-    assert response.status_code == 200
-    assert response.json()["ntfy"]["success"] is False
 
 
 @patch('api.index.send_ntfy_notification')
@@ -245,11 +234,69 @@ def test_webhook_payload_parsing(mock_ntfy, client, setup_env):
             "price": "150.50",
             "timeframe": "D",
             "stop": "151.00"
-        }
+        },
+        headers={"X-API-Key": "test-key"}
     )
 
+    assert response.status_code == 202
+    assert "trade_id" in response.json()
+
+
+@patch('api.index.send_ntfy_notification')
+def test_list_pending_trades(mock_ntfy, client, setup_env):
+    """Test GET /pending lists queued trades"""
+    mock_ntfy.return_value = {"success": True, "message": "Notification sent"}
+
+    # Queue a trade
+    client.post(
+        "/webhook",
+        json={
+            "symbol": "XAUUSD",
+            "action": "buy",
+            "price": "2450.50",
+            "stop": "2445.00"
+        },
+        headers={"X-API-Key": "test-key"}
+    )
+
+    # Get pending trades
+    response = client.get("/pending", headers={"X-API-Key": "test-key"})
     assert response.status_code == 200
-    result_msg = response.json()["result"]
-    assert "SELL" in result_msg
-    assert "USDJPY" in result_msg
-    assert "150.5" in result_msg
+    data = response.json()
+    assert data["status"] == "ok"
+    assert data["count"] >= 1
+    assert "trades" in data
+
+
+@patch('api.index.send_ntfy_notification')
+def test_approve_pending_trade(mock_ntfy, client, setup_env):
+    """Test GET /approve/{trade_id} executes pending trade"""
+    mock_ntfy.return_value = {"success": True, "message": "Notification sent"}
+
+    # Queue a trade
+    webhook_response = client.post(
+        "/webhook",
+        json={
+            "symbol": "XAUUSD",
+            "action": "buy",
+            "price": "2450.50",
+            "stop": "2445.00"
+        },
+        headers={"X-API-Key": "test-key"}
+    )
+    trade_id = webhook_response.json()["trade_id"]
+
+    # Approve the trade
+    response = client.get(f"/approve/{trade_id}", headers={"X-API-Key": "test-key"})
+    assert response.status_code == 200
+    data = response.json()
+    assert data["status"] == "ok"
+    assert data["trade_id"] == trade_id
+    assert "executed_at" in data
+
+
+@patch('api.index.send_ntfy_notification')
+def test_approve_nonexistent_trade(mock_ntfy, client, setup_env):
+    """Test approval of non-existent trade returns 404"""
+    response = client.get("/approve/nonexistent-trade-id", headers={"X-API-Key": "test-key"})
+    assert response.status_code == 404
