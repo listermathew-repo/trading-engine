@@ -13,8 +13,8 @@ try:
     from capital_client import CapitalClient, TradeResult
 except ImportError as e:
     print(f"Warning: Could not import CapitalClient: {e}")
-    CapitalClient = None
-    TradeResult = None
+    CapitalClient = None  # type: ignore
+    TradeResult = None  # type: ignore
 
 try:
     load_dotenv()
@@ -74,18 +74,7 @@ async def receive_webhook(payload: WebhookPayload) -> dict:
     stop_price = float(payload.stop) if payload.stop else None
 
     if SIMULATE:
-        # Create a simple result object for simulation mode
-        from dataclasses import dataclass
-        @dataclass
-        class SimpleResult:
-            success: bool
-            deal_reference: str
-            size: float
-            direction: str
-            epic: str
-            message: str
-
-        result = SimpleResult(
+        result = TradeResult(
             success=True,
             deal_reference="SIM-001",
             size=1.0,
