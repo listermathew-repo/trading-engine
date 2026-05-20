@@ -180,3 +180,31 @@ class CapitalClient:
                 epic=epic,
                 message=str(exc),
             )
+
+    def get_open_positions(self) -> list[dict]:
+        """Fetch current open positions from Capital.com."""
+        try:
+            self.authenticate()
+            resp = requests.get(
+                f"{self.base_url}/positions",
+                headers=self._auth_headers(),
+                timeout=10,
+            )
+            resp.raise_for_status()
+            positions = resp.json().get("positions", [])
+            return [
+                {
+                    "deal_id": p.get("dealId"),
+                    "epic": p.get("epic"),
+                    "direction": p.get("direction"),
+                    "size": p.get("size"),
+                    "open_level": p.get("openLevel"),
+                    "stop_level": p.get("stopLevel"),
+                    "profit_loss": p.get("profitLoss"),
+                    "profit_loss_pct": p.get("profitLossPercentage"),
+                }
+                for p in positions
+            ]
+        except Exception as exc:
+            print(f"[ERROR] Failed to get open positions: {str(exc)}")
+            return []

@@ -56,6 +56,24 @@ def init_db() -> None:
         )
     """)
 
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS trade_attempts (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            symbol TEXT NOT NULL,
+            direction TEXT NOT NULL,
+            attempted_at TEXT NOT NULL
+        )
+    """)
+
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS system_events (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            event_type TEXT NOT NULL,
+            details TEXT,
+            occurred_at TEXT NOT NULL
+        )
+    """)
+
     conn.commit()
     conn.close()
 
@@ -254,6 +272,108 @@ def delete_expired_pending_trades() -> None:
     )
     conn.commit()
     conn.close()
+
+
+def check_duplicate_trade(symbol: str, direction: str) -> bool:
+    """Check if same symbol/direction was requested in last 30 seconds."""
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+
+    threshold = (
+        datetime.utcnow() - __import__('datetime').timedelta(seconds=30)
+    ).isoformat()
+
+    cursor.execute("""
+        SELECT COUNT(*) FROM trade_attempts
+        WHERE symbol = ? AND direction = ? AND attempted_at > ?
+    """, (symbol, direction, threshold))
+
+    count = cursor.fetchone()[0]
+    conn.close()
+    return count > 0
+
+
+def log_trade_attempt(symbol: str, direction: str) -> None:
+    """Log a trade attempt for rate limiting."""
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        INSERT INTO trade_attempts (symbol, direction, attempted_at)
+        VALUES (?, ?, ?)
+    """, (symbol, direction, datetime.utcnow().isoformat()))
+
+    conn.commit()
+    conn.close()
+
+
+def cleanup_old_attempts() -> None:
+    """Remove trade attempts older than 1 hour."""
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+
+    threshold = (
+        datetime.utcnow() - __import__('datetime').timedelta(hours=1)
+    ).isoformat()
+
+    cursor.execute(
+        "DELETE FROM trade_attempts WHERE attempted_at < ?",
+        (threshold,)
+    )
+    conn.commit()
+    conn.close()
+
+
+def log_event(event_type: str, details: str = "") -> None:
+    """Log system events for health monitoring."""
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        INSERT INTO system_events (event_type, details, occurred_at)
+        VALUES (?, ?, ?)
+    """, (event_type, details, datetime.utcnow().isoformat()))
+
+    conn.commit()
+    conn.close()
+
+
+def get_last_event(event_type: str) -> Optional[str]:
+    """Get timestamp of last occurrence of an event type."""
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        SELECT occurred_at FROM system_events
+        WHERE event_type = ?
+        ORDER BY occurred_at DESC
+        LIMIT 1
+    """, (event_type,))
+
+    row = cursor.fetchone()
+    conn.close()
+
+    return row[0] if row else None
+
+
+def get_error_count_last_hour() -> int:
+    """Count errors in the last hour."""
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+
+    threshold = (
+        datetime.utcnow() - __import__('datetime').timedelta(hours=1)
+    ).isoformat()
+
+    cursor.execute("""
+        SELECT COUNT(*) FROM system_events
+        WHERE event_type = 'error' AND occurred_at > ?
+    """, (threshold,))
+
+    count = cursor.fetchone()[0]
+    conn.close()
+
+    return count
 
 
 # Initialize database on module load

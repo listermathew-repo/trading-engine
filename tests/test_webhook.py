@@ -1,8 +1,10 @@
 import pytest
 import os
+import sqlite3
 from unittest.mock import patch, MagicMock
 from fastapi.testclient import TestClient
 from api.index import app
+from api.database import DB_PATH
 
 
 @pytest.fixture
@@ -21,6 +23,40 @@ def setup_env():
 def client():
     """Create FastAPI test client"""
     return TestClient(app)
+
+
+@pytest.fixture
+def clean_db(setup_env):
+    """Clear database tables before each test to prevent rate limit interference"""
+    # Clean tables before test
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    try:
+        cursor.execute("DELETE FROM trade_attempts")
+        cursor.execute("DELETE FROM pending_trades")
+        cursor.execute("DELETE FROM trades")
+        cursor.execute("DELETE FROM system_events")
+        conn.commit()
+    except Exception as e:
+        print(f"Warning: Could not clean database: {e}")
+    finally:
+        conn.close()
+
+    yield
+
+    # Clean tables after test
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    try:
+        cursor.execute("DELETE FROM trade_attempts")
+        cursor.execute("DELETE FROM pending_trades")
+        cursor.execute("DELETE FROM trades")
+        cursor.execute("DELETE FROM system_events")
+        conn.commit()
+    except Exception as e:
+        print(f"Warning: Could not clean database: {e}")
+    finally:
+        conn.close()
 
 
 def test_health_endpoint(client):
@@ -83,7 +119,7 @@ def test_webhook_accepts_valid_api_key(mock_ntfy, client):
 
 
 @patch('api.index.send_ntfy_notification')
-def test_webhook_queues_trade(mock_ntfy, client, setup_env):
+def test_webhook_queues_trade(mock_ntfy, client, clean_db):
     """Test webhook queues trade instead of executing immediately"""
     mock_ntfy.return_value = {"success": True, "message": "Notification sent"}
 
@@ -107,7 +143,7 @@ def test_webhook_queues_trade(mock_ntfy, client, setup_env):
 
 
 @patch('api.index.send_ntfy_notification')
-def test_webhook_buy_order(mock_ntfy, client, setup_env):
+def test_webhook_buy_order(mock_ntfy, client, clean_db):
     """Test webhook processes BUY action"""
     mock_ntfy.return_value = {"success": True, "message": "Notification sent"}
 
@@ -127,7 +163,7 @@ def test_webhook_buy_order(mock_ntfy, client, setup_env):
 
 
 @patch('api.index.send_ntfy_notification')
-def test_webhook_sell_order(mock_ntfy, client, setup_env):
+def test_webhook_sell_order(mock_ntfy, client, clean_db):
     """Test webhook processes SELL action"""
     mock_ntfy.return_value = {"success": True, "message": "Notification sent"}
 
@@ -146,7 +182,7 @@ def test_webhook_sell_order(mock_ntfy, client, setup_env):
     assert "trade_id" in response.json()
 
 
-def test_webhook_missing_required_field(client, setup_env):
+def test_webhook_missing_required_field(client, clean_db):
     """Test webhook with missing required field"""
     response = client.post(
         "/webhook",
@@ -161,7 +197,7 @@ def test_webhook_missing_required_field(client, setup_env):
     assert response.status_code == 422  # Validation error
 
 
-def test_webhook_missing_price(client, setup_env):
+def test_webhook_missing_price(client, clean_db):
     """Test webhook with missing price field"""
     response = client.post(
         "/webhook",
@@ -178,7 +214,7 @@ def test_webhook_missing_price(client, setup_env):
 
 
 @patch('api.index.send_ntfy_notification')
-def test_webhook_optional_stop_level(mock_ntfy, client, setup_env):
+def test_webhook_optional_stop_level(mock_ntfy, client, clean_db):
     """Test webhook with optional stop level omitted"""
     mock_ntfy.return_value = {"success": True, "message": "Notification sent"}
 
@@ -199,7 +235,7 @@ def test_webhook_optional_stop_level(mock_ntfy, client, setup_env):
 
 
 @patch('api.index.send_ntfy_notification')
-def test_webhook_ntfy_notification_called(mock_ntfy, client, setup_env):
+def test_webhook_ntfy_notification_called(mock_ntfy, client, clean_db):
     """Test that ntfy notification is called on webhook"""
     mock_ntfy.return_value = {"success": True, "message": "Notification sent"}
 
@@ -222,7 +258,7 @@ def test_webhook_ntfy_notification_called(mock_ntfy, client, setup_env):
 
 
 @patch('api.index.send_ntfy_notification')
-def test_webhook_payload_parsing(mock_ntfy, client, setup_env):
+def test_webhook_payload_parsing(mock_ntfy, client, clean_db):
     """Test webhook correctly parses payload"""
     mock_ntfy.return_value = {"success": True, "message": "Notification sent"}
 
@@ -243,7 +279,7 @@ def test_webhook_payload_parsing(mock_ntfy, client, setup_env):
 
 
 @patch('api.index.send_ntfy_notification')
-def test_list_pending_trades(mock_ntfy, client, setup_env):
+def test_list_pending_trades(mock_ntfy, client, clean_db):
     """Test GET /pending lists queued trades"""
     mock_ntfy.return_value = {"success": True, "message": "Notification sent"}
 
@@ -269,7 +305,7 @@ def test_list_pending_trades(mock_ntfy, client, setup_env):
 
 
 @patch('api.index.send_ntfy_notification')
-def test_approve_pending_trade(mock_ntfy, client, setup_env):
+def test_approve_pending_trade(mock_ntfy, client, clean_db):
     """Test GET /approve/{trade_id} executes pending trade"""
     mock_ntfy.return_value = {"success": True, "message": "Notification sent"}
 
@@ -296,7 +332,83 @@ def test_approve_pending_trade(mock_ntfy, client, setup_env):
 
 
 @patch('api.index.send_ntfy_notification')
-def test_approve_nonexistent_trade(mock_ntfy, client, setup_env):
+def test_approve_nonexistent_trade(mock_ntfy, client, clean_db):
     """Test approval of non-existent trade returns 404"""
     response = client.get("/approve/nonexistent-trade-id", headers={"X-API-Key": "test-key"})
     assert response.status_code == 404
+
+
+@patch('api.index.send_ntfy_notification')
+def test_duplicate_trade_prevention(mock_ntfy, client, clean_db):
+    """Test rate limiting prevents duplicate trades within 30 seconds"""
+    mock_ntfy.return_value = {"success": True, "message": "Notification sent"}
+
+    # First trade should succeed
+    response1 = client.post(
+        "/webhook",
+        json={
+            "symbol": "XAUUSD",
+            "action": "buy",
+            "price": "2450.50",
+            "stop": "2445.00"
+        },
+        headers={"X-API-Key": "test-key"}
+    )
+    assert response1.status_code == 202
+
+    # Second identical trade within 30 seconds should be blocked
+    response2 = client.post(
+        "/webhook",
+        json={
+            "symbol": "XAUUSD",
+            "action": "buy",
+            "price": "2450.50",
+            "stop": "2445.00"
+        },
+        headers={"X-API-Key": "test-key"}
+    )
+    assert response2.status_code == 429
+    assert "Duplicate trade rejected" in response2.json()["detail"]
+
+
+@patch('api.index.send_ntfy_notification')
+def test_positions_endpoint(mock_ntfy, client, clean_db):
+    """Test GET /positions returns open positions"""
+    response = client.get("/positions", headers={"X-API-Key": "test-key"})
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["status"] == "ok"
+    assert data["simulate"] == True  # Should be in simulation mode
+    assert "positions" in data
+    assert "count" in data
+
+
+@patch('api.index.send_ntfy_notification')
+def test_health_check_with_monitoring(mock_ntfy, client, clean_db):
+    """Test health check includes monitoring metrics"""
+    mock_ntfy.return_value = {"success": True, "message": "Notification sent"}
+
+    # Queue a trade to generate some events
+    client.post(
+        "/webhook",
+        json={
+            "symbol": "XAUUSD",
+            "action": "buy",
+            "price": "2450.50",
+            "stop": "2445.00"
+        },
+        headers={"X-API-Key": "test-key"}
+    )
+
+    response = client.get("/")
+    assert response.status_code == 200
+    data = response.json()
+
+    assert data["status"] == "ok"
+    assert "monitoring" in data
+    monitoring = data["monitoring"]
+    assert "last_webhook_received" in monitoring
+    assert "last_trade_executed" in monitoring
+    assert "error_count_last_hour" in monitoring
+    assert "capital_com_status" in monitoring

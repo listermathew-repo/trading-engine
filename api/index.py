@@ -25,6 +25,12 @@ from database import (  # noqa: E402
     delete_pending_trade,
     delete_expired_pending_trades,
     insert_trade,
+    check_duplicate_trade,
+    log_trade_attempt,
+    cleanup_old_attempts,
+    log_event,
+    get_last_event,
+    get_error_count_last_hour,
     Trade,
 )
 
@@ -87,12 +93,125 @@ def send_ntfy_notification(message: str, title: str = "", priority: str = "defau
 
 @app.get("/")
 def health() -> dict:
-    return {"status": "ok", "simulate": SIMULATE, "ntfy_topic": NTFY_TOPIC}
+    """Health check endpoint with monitoring data."""
+    try:
+        last_webhook = get_last_event("webhook_received")
+        last_trade = get_last_event("trade_executed")
+        error_count = get_error_count_last_hour()
+
+        # Test Capital.com connectivity in live mode
+        capital_status = "unknown"
+        if not SIMULATE:
+            try:
+                if CapitalClient:
+                    client = CapitalClient()
+                    client.authenticate()
+                    capital_status = "ok"
+                else:
+                    capital_status = "unavailable"
+            except Exception as e:
+                capital_status = f"error: {str(e)[:50]}"
+        else:
+            capital_status = "simulated"
+
+        return {
+            "status": "ok",
+            "simulate": SIMULATE,
+            "ntfy_topic": NTFY_TOPIC,
+            "monitoring": {
+                "last_webhook_received": last_webhook,
+                "last_trade_executed": last_trade,
+                "error_count_last_hour": error_count,
+                "capital_com_status": capital_status,
+            },
+        }
+    except Exception as e:
+        print(f"[ERROR] Health check failed: {str(e)}")
+        return {
+            "status": "ok",
+            "simulate": SIMULATE,
+            "ntfy_topic": NTFY_TOPIC,
+            "monitoring": {
+                "error": str(e),
+            },
+        }
+
+
+@app.get("/positions")
+async def get_positions(api_key: str = Depends(verify_api_key)) -> dict:
+    """Get current open positions from Capital.com."""
+    try:
+        if SIMULATE:
+            return {
+                "status": "ok",
+                "simulate": True,
+                "positions": [
+                    {
+                        "deal_id": "SIM-001",
+                        "epic": "GOLD",
+                        "direction": "BUY",
+                        "size": 1.0,
+                        "open_level": 2450.50,
+                        "stop_level": 2445.00,
+                        "profit_loss": 50.00,
+                        "profit_loss_pct": 0.5,
+                    }
+                ],
+                "count": 1,
+            }
+
+        if CapitalClient is None:
+            raise HTTPException(
+                status_code=500,
+                detail="CapitalClient not available"
+            )
+
+        client = CapitalClient()
+        positions = client.get_open_positions()
+
+        return {
+            "status": "ok",
+            "simulate": False,
+            "positions": positions,
+            "count": len(positions),
+        }
+    except Exception as e:
+        error_msg = f"Failed to fetch positions: {str(e)}"
+        print(f"[ERROR] {error_msg}")
+        send_ntfy_notification(
+            message=f"Position fetch error: {error_msg}",
+            title="❌ POSITIONS ERROR",
+            priority="urgent",
+        )
+        raise HTTPException(status_code=500, detail=error_msg)
 
 
 @app.post("/webhook", status_code=202)
 async def receive_webhook(payload: WebhookPayload, api_key: str = Depends(verify_api_key)) -> dict:
     try:
+        direction = payload.action.upper()
+
+        # Check for duplicate trades within 30 seconds
+        if check_duplicate_trade(payload.symbol, direction):
+            cleanup_old_attempts()
+            error_msg = (
+                f"Duplicate trade rejected: {direction} {payload.symbol} "
+                f"already requested within last 30 seconds"
+            )
+            print(f"[RATE-LIMIT] {error_msg}")
+            send_ntfy_notification(
+                message=f"Duplicate trade blocked\n{error_msg}",
+                title="⚠️ DUPLICATE TRADE BLOCKED",
+                priority="high",
+            )
+            raise HTTPException(
+                status_code=429,
+                detail=error_msg
+            )
+
+        log_trade_attempt(payload.symbol, direction)
+        cleanup_old_attempts()
+
         entry_price = float(payload.price)
         stop_price = float(payload.stop) if payload.stop else None
         trade_id = str(uuid.uuid4())
@@ -124,6 +243,11 @@ async def receive_webhook(payload: WebhookPayload, api_key: str = Depends(verify
             priority="high",
         )
 
+        log_event(
+            "webhook_received",
+            f"{direction} {payload.symbol} @ {entry_price} (stop: {stop_price})"
+        )
+
         return {
             "status": "accepted",
             "trade_id": trade_id,
@@ -132,9 +256,14 @@ async def receive_webhook(payload: WebhookPayload, api_key: str = Depends(verify
             "ntfy": ntfy_result,
         }
 
+    except HTTPException:
+        # Re-raise HTTP exceptions (rate limit, auth errors, etc.)
+        raise
+
     except ValueError as e:
         error_msg = f"Invalid price or stop level: {str(e)}"
         print(f"[ERROR] {error_msg}")
+        log_event("error", f"Webhook validation error: {error_msg}")
         send_ntfy_notification(
             message=f"Webhook error: {error_msg}\nPayload: {payload.dict()}",
             title="❌ WEBHOOK ERROR: Invalid Input",
@@ -145,6 +274,7 @@ async def receive_webhook(payload: WebhookPayload, api_key: str = Depends(verify
     except Exception as e:
         error_msg = f"Failed to queue trade: {str(e)}"
         print(f"[ERROR] {error_msg}")
+        log_event("error", f"Webhook queue failed: {error_msg}")
         send_ntfy_notification(
             message=f"Webhook error: {error_msg}\nPayload: {payload.dict()}",
             title="❌ WEBHOOK ERROR: Queue Failed",
@@ -263,6 +393,12 @@ async def approve_trade(trade_id: str, api_key: str = Depends(verify_api_key)) -
 
         insert_trade(trade)
         delete_pending_trade(trade_id)
+
+        event_detail = (
+            f"{result.direction} {result.epic} {result.size}lots @ "
+            f"{trade_data['entry_price']} ({status})"
+        )
+        log_event("trade_executed", event_detail)
 
         ntfy_body = (
             f"{sim_tag}{result.direction} {result.epic}\n"
