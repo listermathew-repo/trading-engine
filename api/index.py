@@ -92,55 +92,86 @@ def health() -> dict:
 
 @app.post("/webhook", status_code=202)
 async def receive_webhook(payload: WebhookPayload, api_key: str = Depends(verify_api_key)) -> dict:
-    entry_price = float(payload.price)
-    stop_price = float(payload.stop) if payload.stop else None
-    trade_id = str(uuid.uuid4())
-    expires_at = (datetime.utcnow() + timedelta(minutes=5)).isoformat()
+    try:
+        entry_price = float(payload.price)
+        stop_price = float(payload.stop) if payload.stop else None
+        trade_id = str(uuid.uuid4())
+        expires_at = (datetime.utcnow() + timedelta(minutes=5)).isoformat()
 
-    insert_pending_trade(
-        trade_id=trade_id,
-        symbol=payload.symbol,
-        direction=payload.action.upper(),
-        entry_price=entry_price,
-        stop_price=stop_price,
-        expires_at=expires_at,
-    )
+        insert_pending_trade(
+            trade_id=trade_id,
+            symbol=payload.symbol,
+            direction=payload.action.upper(),
+            entry_price=entry_price,
+            stop_price=stop_price,
+            expires_at=expires_at,
+        )
 
-    ntfy_body = (
-        f"⏳ APPROVAL REQUIRED\n"
-        f"{payload.action.upper()} {payload.symbol}\n"
-        f"Entry: {entry_price:.2f}"
-        + (f" | Stop: {stop_price:.2f}" if stop_price else "")
-        + f"\nTrade ID: {trade_id}\n"
-        f"Expires: {expires_at}\n"
-        f"GET /pending to review or\n"
-        f"GET /approve/{trade_id} to execute"
-    )
+        ntfy_body = (
+            f"⏳ APPROVAL REQUIRED\n"
+            f"{payload.action.upper()} {payload.symbol}\n"
+            f"Entry: {entry_price:.2f}"
+            + (f" | Stop: {stop_price:.2f}" if stop_price else "")
+            + f"\nTrade ID: {trade_id}\n"
+            f"Expires: {expires_at}\n"
+            f"GET /pending to review or\n"
+            f"GET /approve/{trade_id} to execute"
+        )
 
-    ntfy_result = send_ntfy_notification(
-        message=ntfy_body,
-        title=f"PENDING: {payload.action.upper()} {payload.symbol} @ {entry_price:.2f}",
-        priority="high",
-    )
+        ntfy_result = send_ntfy_notification(
+            message=ntfy_body,
+            title=f"PENDING: {payload.action.upper()} {payload.symbol} @ {entry_price:.2f}",
+            priority="high",
+        )
 
-    return {
-        "status": "accepted",
-        "trade_id": trade_id,
-        "expires_at": expires_at,
-        "message": "Trade queued for approval",
-        "ntfy": ntfy_result,
-    }
+        return {
+            "status": "accepted",
+            "trade_id": trade_id,
+            "expires_at": expires_at,
+            "message": "Trade queued for approval",
+            "ntfy": ntfy_result,
+        }
+
+    except ValueError as e:
+        error_msg = f"Invalid price or stop level: {str(e)}"
+        print(f"[ERROR] {error_msg}")
+        send_ntfy_notification(
+            message=f"Webhook error: {error_msg}\nPayload: {payload.dict()}",
+            title="❌ WEBHOOK ERROR: Invalid Input",
+            priority="urgent",
+        )
+        raise HTTPException(status_code=400, detail=error_msg)
+
+    except Exception as e:
+        error_msg = f"Failed to queue trade: {str(e)}"
+        print(f"[ERROR] {error_msg}")
+        send_ntfy_notification(
+            message=f"Webhook error: {error_msg}\nPayload: {payload.dict()}",
+            title="❌ WEBHOOK ERROR: Queue Failed",
+            priority="urgent",
+        )
+        raise HTTPException(status_code=500, detail=error_msg)
 
 
 @app.get("/pending")
 async def list_pending(api_key: str = Depends(verify_api_key)) -> dict:
-    delete_expired_pending_trades()
-    pending = get_pending_trades()
-    return {
-        "status": "ok",
-        "count": len(pending),
-        "trades": pending,
-    }
+    try:
+        delete_expired_pending_trades()
+        pending = get_pending_trades()
+        return {
+            "status": "ok",
+            "count": len(pending),
+            "trades": pending,
+        }
+    except Exception as e:
+        error_msg = f"Failed to retrieve pending trades: {str(e)}"
+        print(f"[ERROR] {error_msg}")
+        send_ntfy_notification(
+            message=f"Database error: {error_msg}",
+            title="❌ PENDING TRADES ERROR",
+            priority="urgent",
+        )
+        raise HTTPException(status_code=500, detail=error_msg)
 
 
 async def execute_pending_trade(trade_id: str):
@@ -179,59 +210,95 @@ async def execute_pending_trade(trade_id: str):
 async def approve_trade(trade_id: str, api_key: str = Depends(verify_api_key)) -> dict:
     try:
         result = await execute_pending_trade(trade_id)
+    except HTTPException as e:
+        if e.status_code == 404:
+            error_msg = f"Trade {trade_id} not found"
+            print(f"[ERROR] {error_msg}")
+            send_ntfy_notification(
+                message=f"Approval failed: {error_msg}",
+                title="❌ TRADE NOT FOUND",
+                priority="urgent",
+            )
+        raise
+    except Exception as e:
+        error_msg = f"Execution failed: {str(e)}"
+        print(f"[ERROR] {error_msg}")
+        send_ntfy_notification(
+            message=f"Trade execution error: {error_msg}\nTrade ID: {trade_id}",
+            title="❌ EXECUTION ERROR",
+            priority="urgent",
+        )
+        raise HTTPException(status_code=500, detail=error_msg)
+
+    try:
+        pending = get_pending_trades()
+        trade_data = next((t for t in pending if t["id"] == trade_id), None)
+
+        if not trade_data:
+            error_msg = f"Trade {trade_id} not found after execution"
+            print(f"[ERROR] {error_msg}")
+            send_ntfy_notification(
+                message=f"Database error: {error_msg}",
+                title="❌ DATABASE ERROR",
+                priority="urgent",
+            )
+            raise HTTPException(status_code=404, detail=error_msg)
+
+        status = "FILLED" if result.success else "FAILED"
+        sim_tag = "[SIM] " if SIMULATE else ""
+
+        trade = Trade(
+            id=trade_id,
+            symbol=trade_data["symbol"],
+            direction=trade_data["direction"],
+            entry_price=trade_data["entry_price"],
+            stop_price=trade_data["stop_price"],
+            size=result.size,
+            deal_reference=result.deal_reference,
+            status=status,
+            created_at=trade_data["created_at"],
+            executed_at=datetime.utcnow().isoformat(),
+            message=result.message,
+        )
+
+        insert_trade(trade)
+        delete_pending_trade(trade_id)
+
+        ntfy_body = (
+            f"{sim_tag}{result.direction} {result.epic}\n"
+            f"Entry: {trade_data['entry_price']:.2f}"
+            + (f" | Stop: {trade_data['stop_price']:.2f}"
+               if trade_data['stop_price'] else "")
+            + f"\nSize: {result.size} lots\n"
+            f"Ref: {result.deal_reference or 'N/A'}\n"
+            f"{result.message}"
+        )
+
+        ntfy_result = send_ntfy_notification(
+            message=ntfy_body,
+            title=f"{sim_tag}{result.direction} {result.epic} - {status}",
+            priority="high" if result.success else "urgent",
+        )
+
+        if not result.success:
+            raise HTTPException(status_code=500, detail=result.message)
+
+        return {
+            "status": "ok",
+            "trade_id": trade_id,
+            "result": result.message,
+            "executed_at": trade.executed_at,
+            "ntfy": ntfy_result,
+        }
+
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-    pending = get_pending_trades()
-    trade_data = next((t for t in pending if t["id"] == trade_id), None)
-
-    if not trade_data:
-        raise HTTPException(status_code=404, detail=f"Trade {trade_id} not found")
-
-    status = "FILLED" if result.success else "FAILED"
-    sim_tag = "[SIM] " if SIMULATE else ""
-
-    trade = Trade(
-        id=trade_id,
-        symbol=trade_data["symbol"],
-        direction=trade_data["direction"],
-        entry_price=trade_data["entry_price"],
-        stop_price=trade_data["stop_price"],
-        size=result.size,
-        deal_reference=result.deal_reference,
-        status=status,
-        created_at=trade_data["created_at"],
-        executed_at=datetime.utcnow().isoformat(),
-        message=result.message,
-    )
-
-    insert_trade(trade)
-    delete_pending_trade(trade_id)
-
-    ntfy_body = (
-        f"{sim_tag}{result.direction} {result.epic}\n"
-        f"Entry: {trade_data['entry_price']:.2f}"
-        + (f" | Stop: {trade_data['stop_price']:.2f}" if trade_data['stop_price'] else "")
-        + f"\nSize: {result.size} lots\n"
-        f"Ref: {result.deal_reference or 'N/A'}\n"
-        f"{result.message}"
-    )
-
-    ntfy_result = send_ntfy_notification(
-        message=ntfy_body,
-        title=f"{sim_tag}{result.direction} {result.epic} - {status}",
-        priority="high" if result.success else "urgent",
-    )
-
-    if not result.success:
-        raise HTTPException(status_code=500, detail=result.message)
-
-    return {
-        "status": "ok",
-        "trade_id": trade_id,
-        "result": result.message,
-        "executed_at": trade.executed_at,
-        "ntfy": ntfy_result,
-    }
+        error_msg = f"Failed to process trade result: {str(e)}"
+        print(f"[ERROR] {error_msg}")
+        send_ntfy_notification(
+            message=f"Post-execution error: {error_msg}\nTrade ID: {trade_id}",
+            title="❌ POST-EXECUTION ERROR",
+            priority="urgent",
+        )
+        raise HTTPException(status_code=500, detail=error_msg)
