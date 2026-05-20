@@ -29,6 +29,57 @@ def test_health_endpoint(client):
     assert response.json()["status"] == "ok"
 
 
+@patch.dict(os.environ, {"WEBHOOK_API_KEY": "test-key-12345"})
+def test_webhook_requires_api_key(client):
+    """Test webhook rejects requests without API key"""
+    response = client.post(
+        "/webhook",
+        json={
+            "symbol": "XAUUSD",
+            "action": "buy",
+            "price": "2450.50",
+            "stop": "2445.00"
+        }
+    )
+    assert response.status_code == 401
+    assert "API" in response.json()["detail"]
+
+
+@patch.dict(os.environ, {"WEBHOOK_API_KEY": "test-key-12345"})
+def test_webhook_rejects_invalid_api_key(client):
+    """Test webhook rejects invalid API key"""
+    response = client.post(
+        "/webhook",
+        json={
+            "symbol": "XAUUSD",
+            "action": "buy",
+            "price": "2450.50",
+            "stop": "2445.00"
+        },
+        headers={"X-API-Key": "wrong-key"}
+    )
+    assert response.status_code == 401
+
+
+@patch("api.index.send_ntfy_notification")
+@patch.dict(os.environ, {"WEBHOOK_API_KEY": "test-key-12345"})
+def test_webhook_accepts_valid_api_key(mock_ntfy, client):
+    """Test webhook accepts requests with valid API key"""
+    mock_ntfy.return_value = {"success": True, "message": "Notification sent"}
+
+    response = client.post(
+        "/webhook",
+        json={
+            "symbol": "XAUUSD",
+            "action": "buy",
+            "price": "2450.50",
+            "stop": "2445.00"
+        },
+        headers={"X-API-Key": "test-key-12345"}
+    )
+    assert response.status_code == 200
+
+
 @patch('api.index.send_ntfy_notification')
 def test_webhook_simulation_mode(mock_ntfy, client, setup_env):
     """Test webhook in simulation mode"""

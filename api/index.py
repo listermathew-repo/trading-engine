@@ -1,7 +1,7 @@
 import os
 import sys
 import requests
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Depends
 from pydantic import BaseModel
 from typing import Optional
 from dotenv import load_dotenv
@@ -15,6 +15,8 @@ except ImportError as e:
     print(f"Warning: Could not import CapitalClient: {e}")
     CapitalClient = None  # type: ignore
     TradeResult = None  # type: ignore
+
+from auth import verify_api_key
 
 try:
     load_dotenv()
@@ -69,7 +71,7 @@ def health() -> dict:
 
 
 @app.post("/webhook")
-async def receive_webhook(payload: WebhookPayload) -> dict:
+async def receive_webhook(payload: WebhookPayload, api_key: str = Depends(verify_api_key)) -> dict:
     entry_price = float(payload.price)
     stop_price = float(payload.stop) if payload.stop else None
 
