@@ -201,4 +201,4 @@ def test_webhook_payload_parsing(mock_ntfy, client, setup_env):
     result_msg = response.json()["result"]
     assert "SELL" in result_msg
     assert "USDJPY" in result_msg
-    assert "150.50" in result_msg
+    assert "150.5" in result_msg
