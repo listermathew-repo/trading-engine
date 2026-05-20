@@ -16,7 +16,10 @@ except ImportError as e:
     CapitalClient = None
     TradeResult = None
 
-load_dotenv()
+try:
+    load_dotenv()
+except Exception as e:
+    print(f"Warning: Could not load .env: {e}")
 
 app = FastAPI(title="TradingView Webhook → Capital.com")
 
