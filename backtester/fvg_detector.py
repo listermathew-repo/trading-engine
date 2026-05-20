@@ -3,7 +3,7 @@
 from dataclasses import dataclass
 from typing import Optional
 from datetime import datetime
-from capital_data import OHLCV
+from .capital_data import OHLCV
 
 
 @dataclass

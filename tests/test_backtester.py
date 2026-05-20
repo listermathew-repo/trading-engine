@@ -5,13 +5,13 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 import sys
 
-# Add backtester to path
-sys.path.insert(0, str(Path(__file__).parent.parent / "backtester"))
+# Add parent directory to path
+sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from capital_data import OHLCV
-from fvg_detector import FVG, FVGDetector
-from swing_detector import SwingDetector
-from strategy import FVGStrategy, BacktestTrade, TradeStatus
+from backtester.capital_data import OHLCV
+from backtester.fvg_detector import FVG, FVGDetector
+from backtester.swing_detector import SwingDetector
+from backtester.strategy import FVGStrategy, BacktestTrade, TradeStatus
 
 
 @pytest.fixture

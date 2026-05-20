@@ -4,7 +4,7 @@ import csv
 from pathlib import Path
 from datetime import datetime
 from typing import Optional
-from strategy import BacktestTrade, BacktestResults, TradeStatus
+from .strategy import BacktestTrade, BacktestResults, TradeStatus
 
 
 class ResultsReporter:

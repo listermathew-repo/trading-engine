@@ -4,9 +4,9 @@ from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 from enum import Enum
-from capital_data import OHLCV
-from fvg_detector import FVG, FVGDetector
-from swing_detector import SwingDetector
+from .capital_data import OHLCV
+from .fvg_detector import FVG, FVGDetector
+from .swing_detector import SwingDetector
 
 
 class TradeStatus(Enum):

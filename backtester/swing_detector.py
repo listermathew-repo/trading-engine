@@ -1,7 +1,7 @@
 """Detect swing lows for stop loss placement."""
 
 from typing import Optional
-from capital_data import OHLCV
+from .capital_data import OHLCV
 
 
 class SwingDetector:
