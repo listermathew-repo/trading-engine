@@ -118,7 +118,7 @@ async def receive_webhook(payload: WebhookPayload):
 
     ntfy_result = send_ntfy_notification(
         message=ntfy_body,
-        title=f"{sim_tag}{payload.action.upper()} {payload.symbol} @ {entry_price:.2f} — {status}",
+        title=f"{sim_tag}{payload.action.upper()} {payload.symbol} @ {entry_price:.2f} - {status}",
         priority="high" if result.success else "urgent",
     )
 
