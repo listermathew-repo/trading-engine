@@ -7,6 +7,7 @@ from enum import Enum
 from .capital_data import OHLCV
 from .fvg_detector import FVG, FVGDetector
 from .swing_detector import SwingDetector
+from .slippage_model import RealisticBacktestSimulator, REALISTIC_FOREX_CONFIG
 
 
 class TradeStatus(Enum):
@@ -31,9 +32,9 @@ class BacktestTrade:
     """Single trade in the backtest."""
     entry_index: int          # Index in 15m candle list
     entry_time: datetime      # Entry timestamp
-    entry_price: float        # Entry price (high of lowest red candle)
+    entry_price: float        # Entry price (high of lowest red candle - theoretical)
     stop_loss: float          # Stop loss price
-    take_profit: float        # Take profit price (1R)
+    take_profit: float        # Take profit price (1R - theoretical)
     direction: str            # "BUY" or "SELL"
     risk_per_trade: float     # Risk amount in $ (position sizing)
     fvg_zone: FVG             # Associated FVG
@@ -41,10 +42,11 @@ class BacktestTrade:
     session: str              # Session type at entry
     exit_index: Optional[int] = None      # Index where trade exited
     exit_time: Optional[datetime] = None  # Exit timestamp
-    exit_price: Optional[float] = None    # Exit price
+    exit_price: Optional[float] = None    # Exit price (theoretical)
     status: TradeStatus = TradeStatus.PENDING
     r_gained: float = 0.0     # R multiples gained/lost
-    pnl: float = 0.0          # Profit/loss in $
+    pnl: float = 0.0          # Profit/loss in $ (theoretical)
+    pnl_realistic: float = 0.0  # Profit/loss with slippage/commission
     liquidity_level: str = "normal"  # "high" or "low" based on time
 
     def __repr__(self) -> str:
@@ -89,15 +91,23 @@ class BacktestResults:
 
 
 class FVGStrategy:
-    """Fair Value Gap strategy backtester."""
+    """Fair Value Gap strategy backtester with realistic slippage modeling."""
 
     def __init__(
         self,
         risk_per_trade: float = 100.0,  # $ per trade
         lookback_periods: list[int] = [5, 10, 20],
+        use_realistic_slippage: bool = True,  # Account for slippage and commission
     ):
         self.risk_per_trade = risk_per_trade
         self.lookback_periods = lookback_periods
+        self.use_realistic_slippage = use_realistic_slippage
+
+        # Initialize slippage simulator for realistic backtesting
+        if use_realistic_slippage:
+            self.simulator = RealisticBacktestSimulator(REALISTIC_FOREX_CONFIG)
+        else:
+            self.simulator = None
 
     @staticmethod
     def to_adelaide_time(utc_time: datetime) -> datetime:
@@ -319,8 +329,8 @@ class FVGStrategy:
                 return i
         return None
 
-    @staticmethod
     def _simulate_exit(
+        self,
         trade: BacktestTrade,
         candles: list[OHLCV],
         entry_idx: int,
@@ -347,6 +357,7 @@ class FVGStrategy:
                         risk_distance = trade.entry_price - trade.stop_loss
                         trade.r_gained = -1.0
                         trade.pnl = -trade.risk_per_trade
+                        trade.pnl_realistic = self._calculate_realistic_pnl(trade)
                         return
                 else:  # SELL
                     if candle.high >= trade.stop_loss:
@@ -357,6 +368,7 @@ class FVGStrategy:
                         risk_distance = trade.stop_loss - trade.entry_price
                         trade.r_gained = -1.0
                         trade.pnl = -trade.risk_per_trade
+                        trade.pnl_realistic = self._calculate_realistic_pnl(trade)
                         return
 
             # Check for stop loss or take profit hit
@@ -369,6 +381,7 @@ class FVGStrategy:
                     risk_distance = trade.entry_price - trade.stop_loss
                     trade.r_gained = -1.0
                     trade.pnl = -trade.risk_per_trade
+                    trade.pnl_realistic = self._calculate_realistic_pnl(trade)
                     return
 
                 if candle.high >= trade.take_profit:
@@ -379,6 +392,7 @@ class FVGStrategy:
                     risk_distance = trade.entry_price - trade.stop_loss
                     trade.r_gained = (trade.take_profit - trade.entry_price) / risk_distance
                     trade.pnl = trade.risk_per_trade * trade.r_gained
+                    trade.pnl_realistic = self._calculate_realistic_pnl(trade)
                     return
 
             else:  # SELL
@@ -390,6 +404,7 @@ class FVGStrategy:
                     risk_distance = trade.stop_loss - trade.entry_price
                     trade.r_gained = -1.0
                     trade.pnl = -trade.risk_per_trade
+                    trade.pnl_realistic = self._calculate_realistic_pnl(trade)
                     return
 
                 if candle.low <= trade.take_profit:
@@ -400,10 +415,48 @@ class FVGStrategy:
                     risk_distance = trade.stop_loss - trade.entry_price
                     trade.r_gained = (trade.entry_price - trade.take_profit) / risk_distance
                     trade.pnl = trade.risk_per_trade * trade.r_gained
+                    trade.pnl_realistic = self._calculate_realistic_pnl(trade)
                     return
 
         # Trade still open at end of data
         trade.status = TradeStatus.PENDING
+
+    def _calculate_realistic_pnl(
+        self,
+        trade: BacktestTrade,
+    ) -> float:
+        """Calculate net PnL with slippage and commission."""
+        if not self.simulator or trade.exit_price is None:
+            return trade.pnl
+
+        # Adjust entry and exit prices for slippage
+        adjusted_entry, entry_slippage = self.simulator.simulate_entry(
+            trade.entry_price,
+            trade.direction,
+        )
+
+        adjusted_exit = self.simulator.apply_exit_slippage(
+            trade.exit_price,
+            trade.direction,
+            entry_slippage,  # Reuse entry slippage for consistency
+        )
+
+        # Calculate gross PnL with adjusted prices
+        if trade.direction == "BUY":
+            gross_pnl = (adjusted_exit - adjusted_entry) * 10000  # Approximate for 1 lot
+        else:  # SELL
+            gross_pnl = (adjusted_entry - adjusted_exit) * 10000
+
+        # Calculate net PnL with commission
+        net_pnl = self.simulator.calculate_net_pnl(
+            gross_pnl,
+            adjusted_entry,
+            adjusted_exit,
+            trade.direction,
+            1.0,  # 1 lot assumed
+        )
+
+        return net_pnl
 
     @staticmethod
     def _calculate_statistics(results: BacktestResults) -> None:

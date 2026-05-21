@@ -137,20 +137,20 @@ TRADE MANAGEMENT REMINDER
   - Daily loss $1,600 = close everything. Done for the day.
 
 ──────────────────────────────────────────────
-FTMO HARD STOPS — NON-NEGOTIABLE (hardcoded)
+Prop Firm HARD STOPS — NON-NEGOTIABLE (hardcoded)
 ──────────────────────────────────────────────
 
-  ⚠  FTMO 5% Daily DD   →  $4,000 real loss  =  TERMINAL HALT
+  ⚠  Prop Firm 5% Daily DD   →  $4,000 real loss  =  TERMINAL HALT
      No new entries until next ACST session. No exceptions.
 
-  ⛔  FTMO 10% Max DD    →  $8,000 real loss  =  CHALLENGE OVER
+  ⛔  Prop Firm 10% Max DD    →  $8,000 real loss  =  CHALLENGE OVER
      Liquidate ALL positions immediately. 48-hour strategy review.
 
   Soft buffers (raise alert, reduce to T1 only):
   - 4% daily  →  $3,200  — T1 only, high alert
   - 9% total  →  $7,200  — T1 only, consider stopping
 
-  Scale factor: Real × 1.25 = FTMO shadow equivalent
+  Scale factor: Real × 1.25 = Prop Firm shadow equivalent
   Max risk per trade: $400 (T2) to $800 (T4). Never exceed $800.
 
 ══════════════════════════════════════════════
