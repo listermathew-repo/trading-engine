@@ -1,0 +1,25 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(curl -s http://localhost:3000/api/positions)",
+      "Bash(python3 -m json.tool)",
+      "Bash(curl -s http://localhost:3000/api/pending)",
+      "Bash(curl -s \"http://localhost:3000/api/pending\" -H \"Content-Type: application/json\")",
+      "mcp__tradingview__chart_get_state",
+      "mcp__tradingview__quote_get",
+      "mcp__tradingview__data_get_study_values",
+      "mcp__tradingview__data_get_ohlcv",
+      "mcp__tradingview__chart_set_symbol",
+      "Bash(curl -s http://localhost:3000/api/health)",
+      "mcp__Claude_Preview__preview_start",
+      "Bash(curl -s \"http://localhost:3000/api/monitor?q=status\")",
+      "Bash(npm run *)",
+      "Bash(curl -s -X POST http://localhost:3000/api/alerts -H 'Content-Type: application/json' -H 'X-API-Key: test-key' -d '{ *)",
+      "Bash(npm install *)",
+      "Bash(node create-pending-trade.js)",
+      "Bash(git add *)",
+      "Bash(git init *)",
+      "Bash(git commit -m 'feat: Fix linting errors and verify sendAlert refactoring *)"
+    ]
+  }
+}
