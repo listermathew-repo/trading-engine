@@ -1,0 +1,43 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model TradeAlert {
+  id           String   @id @default(cuid())
+  ticker       String
+  direction    String   // "long" or "short"
+  entryLevel   Float
+  stopLevel    Float
+  takeProfit   Float
+  setupType    String
+  timeframe    String
+  status       String   @default("pending") // pending, executed, cancelled, expired
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  executedAt   DateTime?
+  notes        String?
+
+  @@index([ticker])
+  @@index([createdAt])
+  @@index([status])
+}
+
+model AlertLog {
+  id        String   @id @default(cuid())
+  level     String   // "info", "warn", "error"
+  message   String
+  payload   String?
+  error     String?
+  createdAt DateTime @default(now())
+
+  @@index([level])
+  @@index([createdAt])
+}
