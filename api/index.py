@@ -103,12 +103,9 @@ def health() -> dict:
         capital_status = "unknown"
         if not SIMULATE:
             try:
-                if CapitalClient:
-                    client = CapitalClient()
-                    client.authenticate()
-                    capital_status = "ok"
-                else:
-                    capital_status = "unavailable"
+                client = CapitalClient()
+                client.authenticate()
+                capital_status = "ok"
             except Exception as e:
                 capital_status = f"error: {str(e)[:50]}"
         else:
