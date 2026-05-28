@@ -1,0 +1,107 @@
+﻿[2026-04-20 13:45:03] SENT [min] System OK | Alert pipeline healthy. Morning briefing fires in 5 minutes.
+[2026-04-20 14:59:37] SENT [default] No Setups Today | Conditions not met on any pair. Stand down - enjoy your afternoon. Gold below EMA20 + German PPI at 15:30 open. Reassess at 15:45.
+[2026-04-20 15:00:03] SENT [high] 15:00 Signal Check - Open Claude | Time for your pre-session check. Monday - run weekly bias + signal check. London open at 15:30 ACST.
+[2026-04-20 16:34:06] SENT [default] Channel Test | mgm-7k4x-live is live. System operational.
+[2026-04-20 16:50:03] SENT [high] London Close in 10 Min - Review Positions | London prime window closes at 17:00 ACST. Review ALL open positions now. Close, protect, or confirm you are holding with a valid reason.
+[2026-04-21 08:32:12] SENT [default] Daily Briefing - Open Claude | Good morning! Quick daily check-in: scenario video done? Paste today's ForexFactory calendar to Claude. Session starts 15:30 ACST.
+[2026-04-21 08:32:12] FAILED [min] System OK | The process cannot access the file 'C:\Users\mathe\trading-alerts\logs\alert-log.txt' because it is being used by another process.
+[2026-04-21 08:32:22] RETRY OK [min] System OK
+[2026-04-21 11:52:19] SENT [default] TEST ALERT | mgm-7k4x-live pipeline confirmed. System operational. Tuesday 21 Apr 2026.
+[2026-04-21 15:00:03] SENT [high] 15:00 Signal Check - Open Claude | Time for your pre-session check. Tuesday - prime setup day, check all 3 pairs. London open at 15:30 ACST.
+[2026-04-21 16:50:03] SENT [high] London Close in 10 Min - Review Positions | London prime window closes at 17:00 ACST. Review ALL open positions now. Close, protect, or confirm you are holding with a valid reason.
+[2026-04-21 23:50:04] SENT [urgent] NY Close + GOLD CUTOFF in 10 Min | NY session ends at midnight ACST. GOLD CUTOFF IN 10 MINUTES - no new Gold positions after 00:00 ACST. Close or protect all positions now.
+[2026-04-22 08:23:51] SENT [min] System OK | Alert pipeline healthy. Morning briefing fires in 5 minutes.
+[2026-04-22 08:23:51] FAILED [default] Daily Briefing - Open Claude | The process cannot access the file 'C:\Users\mathe\trading-alerts\logs\alert-log.txt' because it is being used by another process.
+[2026-04-22 08:24:02] RETRY OK [default] Daily Briefing - Open Claude
+[2026-04-22 15:00:06] SENT [high] 15:00 Signal Check - Open Claude | Time for your pre-session check. Wednesday - caution day, setups less likely. London open at 15:30 ACST.
+[2026-04-22 15:00:06] SENT [default] Wednesday Caution | Wednesday: A+ setup ONLY. T2 maximum (no T3/T4). All 5 conditions must be met + Scenario 1 confirmed. Default posture = wait. If setup qualifies, take it. Check morning video for continuation bias before entry.
+[2026-04-23 08:46:17] SENT [min] System OK | Alert pipeline healthy. Morning briefing fires in 5 minutes.
+[2026-04-23 08:46:17] FAILED [default] Daily Briefing - Open Claude | The process cannot access the file 'C:\Users\mathe\trading-alerts\logs\alert-log.txt' because it is being used by another process.
+[2026-04-23 08:46:28] RETRY OK [default] Daily Briefing - Open Claude
+[2026-04-23 15:00:03] SENT [high] 15:00 Signal Check - Open Claude | Time for your pre-session check. Thursday - prime setup day, check all 3 pairs. London open at 15:30 ACST.
+[2026-04-23 16:50:03] SENT [high] London Close in 10 Min - Review Positions | London prime window closes at 17:00 ACST. Review ALL open positions now. Close, protect, or confirm you are holding with a valid reason.
+[2026-04-24 07:55:03] SENT [min] System OK | Alert pipeline healthy. Morning briefing fires in 5 minutes.
+[2026-04-24 08:13:02] SENT [default] Daily Briefing - Open Claude | Good morning! Quick daily check-in: scenario video done? Paste today's ForexFactory calendar to Claude. Session starts 15:30 ACST.
+[2026-04-24 15:32:02] SENT [high] 15:00 Signal Check - Open Claude | Time for your pre-session check. Friday - optional session, check conditions first. London open at 15:30 ACST.
+[2026-04-24 16:50:05] SENT [high] London Close in 10 Min - Review Positions | London prime window closes at 17:00 ACST. Review ALL open positions now. Close, protect, or confirm you are holding with a valid reason.
+[2026-04-27 08:42:35] SENT [high] Monday Planning Session - Open Claude | Good morning! Time for your weekly planning session. Watch the scenario video, paste ForexFactory calendar, then open Claude at 08:30 ACST.
+[2026-04-27 08:42:35] FAILED [min] System OK | The process cannot access the file 'C:\Users\mathe\trading-alerts\logs\alert-log.txt' because it is being used by another process.
+[2026-04-27 08:42:46] RETRY OK [min] System OK
+[2026-04-27 16:21:23] SENT [high] 15:00 Signal Check - Open Claude | Time for your pre-session check. Monday - run weekly bias + signal check. London open at 15:30 ACST.
+[2026-04-27 16:50:05] SENT [high] London Close in 10 Min - Review Positions | London prime window closes at 17:00 ACST. Review ALL open positions now. Close, protect, or confirm you are holding with a valid reason.
+[2026-04-28 15:44:38] FAILED [high] 15:00 Signal Check - Open Claude | Unable to connect to the remote server
+[2026-04-28 15:45:28] RETRY OK [high] 15:00 Signal Check - Open Claude
+[2026-04-28 16:50:04] SENT [high] London Close in 10 Min - Review Positions | London prime window closes at 17:00 ACST. Review ALL open positions now. Close, protect, or confirm you are holding with a valid reason.
+[2026-04-29 08:14:23] SENT [default] Daily Briefing - Open Claude | Good morning! Quick daily check-in: scenario video done? Paste today's ForexFactory calendar to Claude. Session starts 15:30 ACST.
+[2026-04-29 08:14:23] FAILED [min] System OK | The process cannot access the file 'C:\Users\mathe\trading-alerts\logs\alert-log.txt' because it is being used by another process.
+[2026-04-29 08:14:34] RETRY OK [min] System OK
+[2026-04-29 15:00:05] SENT [default] Wednesday Caution | Wednesday: A+ setup ONLY. T2 maximum (no T3/T4). All 5 conditions must be met + Scenario 1 confirmed. Default posture = wait. If setup qualifies, take it. Check morning video for continuation bias before entry.
+[2026-04-29 15:00:05] FAILED [high] 15:00 Signal Check - Open Claude | The process cannot access the file 'C:\Users\mathe\trading-alerts\logs\alert-log.txt' because it is being used by another process.
+[2026-04-29 15:00:16] RETRY OK [high] 15:00 Signal Check - Open Claude
+[2026-04-30 09:00:45] SENT [min] System OK | Alert pipeline healthy. Morning briefing fires in 5 minutes.
+[2026-04-30 09:00:49] SENT [default] Daily Briefing - Open Claude | Good morning! Quick daily check-in: scenario video done? Paste today's ForexFactory calendar to Claude. Session starts 15:30 ACST.
+[2026-04-30 15:00:05] SENT [high] 15:00 Signal Check - Open Claude | Time for your pre-session check. Thursday - prime setup day, check all 3 pairs. London open at 15:30 ACST.
+[2026-04-30 16:50:05] SENT [high] London Close in 10 Min - Review Positions | London prime window closes at 17:00 ACST. Review ALL open positions now. Close, protect, or confirm you are holding with a valid reason.
+[2026-05-01 08:58:41] SENT [default] Daily Briefing - Open Claude | Good morning! Quick daily check-in: scenario video done? Paste today's ForexFactory calendar to Claude. Session starts 15:30 ACST.
+[2026-05-01 08:58:42] FAILED [min] System OK | The process cannot access the file 'C:\Users\mathe\trading-alerts\logs\alert-log.txt' because it is being used by another process.
+[2026-05-01 08:58:53] RETRY OK [min] System OK
+[2026-05-01 15:00:08] SENT [high] 15:00 Signal Check - Open Claude | Time for your pre-session check. Friday - optional session, check conditions first. London open at 15:30 ACST.
+[2026-05-01 16:50:04] SENT [high] London Close in 10 Min - Review Positions | London prime window closes at 17:00 ACST. Review ALL open positions now. Close, protect, or confirm you are holding with a valid reason.
+[2026-05-04 08:40:17] SENT [high] Monday Planning Session - Open Claude | Good morning! Time for your weekly planning session. Watch the scenario video, paste ForexFactory calendar, then open Claude at 08:30 ACST.
+[2026-05-04 08:40:18] FAILED [min] System OK | The process cannot access the file 'C:\Users\mathe\trading-alerts\logs\alert-log.txt' because it is being used by another process.
+[2026-05-04 08:40:29] RETRY OK [min] System OK
+[2026-05-04 15:00:04] SENT [high] 15:00 Signal Check - Open Claude | Time for your pre-session check. Monday - run weekly bias + signal check. London open at 15:30 ACST.
+[2026-05-04 16:50:04] SENT [high] London Close in 10 Min - Review Positions | London prime window closes at 17:00 ACST. Review ALL open positions now. Close, protect, or confirm you are holding with a valid reason.
+[2026-05-05 08:35:42] SENT [default] Daily Briefing - Open Claude | Good morning! Quick daily check-in: scenario video done? Paste today's ForexFactory calendar to Claude. Session starts 15:30 ACST.
+[2026-05-05 08:35:42] FAILED [min] System OK | The process cannot access the file 'C:\Users\mathe\trading-alerts\logs\alert-log.txt' because it is being used by another process.
+[2026-05-05 08:35:53] RETRY OK [min] System OK
+[2026-05-05 15:00:05] SENT [high] 15:00 Signal Check - Open Claude | Time for your pre-session check. Tuesday - prime setup day, check all 3 pairs. London open at 15:30 ACST.
+[2026-05-06 08:50:09] SENT [min] System OK | Alert pipeline healthy. Morning briefing fires in 5 minutes.
+[2026-05-06 08:50:09] FAILED [default] Daily Briefing - Open Claude | The process cannot access the file 'C:\Users\mathe\trading-alerts\logs\alert-log.txt' because it is being used by another process.
+[2026-05-06 08:50:20] RETRY OK [default] Daily Briefing - Open Claude
+[2026-05-06 15:00:06] SENT [high] 15:00 Signal Check - Open Claude | Time for your pre-session check. Wednesday - caution day, setups less likely. London open at 15:30 ACST.
+[2026-05-06 15:00:06] FAILED [default] Wednesday Caution | The process cannot access the file 'C:\Users\mathe\trading-alerts\logs\alert-log.txt' because it is being used by another process.
+[2026-05-06 15:00:17] RETRY OK [default] Wednesday Caution
+[2026-05-06 16:50:05] SENT [high] London Close in 10 Min - Review Positions | London prime window closes at 17:00 ACST. Review ALL open positions now. Close, protect, or confirm you are holding with a valid reason.
+[2026-05-07 08:55:52] SENT [min] System OK | Alert pipeline healthy. Morning briefing fires in 5 minutes.
+[2026-05-07 08:55:52] FAILED [default] Daily Briefing - Open Claude | The process cannot access the file 'C:\Users\mathe\trading-alerts\logs\alert-log.txt' because it is being used by another process.
+[2026-05-07 08:56:03] RETRY OK [default] Daily Briefing - Open Claude
+[2026-05-07 15:00:03] SENT [high] 15:00 Signal Check - Open Claude | Time for your pre-session check. Thursday - prime setup day, check all 3 pairs. London open at 15:30 ACST.
+[2026-05-07 16:50:12] SENT [high] London Close in 10 Min - Review Positions | London prime window closes at 17:00 ACST. Review ALL open positions now. Close, protect, or confirm you are holding with a valid reason.
+[2026-05-08 08:32:21] SENT [min] System OK | Alert pipeline healthy. Morning briefing fires in 5 minutes.
+[2026-05-08 08:32:21] FAILED [default] Daily Briefing - Open Claude | The process cannot access the file 'C:\Users\mathe\trading-alerts\logs\alert-log.txt' because it is being used by another process.
+[2026-05-08 08:32:32] RETRY OK [default] Daily Briefing - Open Claude
+[2026-05-08 15:00:04] SENT [high] 15:00 Signal Check - Open Claude | Time for your pre-session check. Friday - optional session, check conditions first. London open at 15:30 ACST.
+[2026-05-08 16:50:04] SENT [high] London Close in 10 Min - Review Positions | London prime window closes at 17:00 ACST. Review ALL open positions now. Close, protect, or confirm you are holding with a valid reason.
+[2026-05-08 23:50:04] SENT [urgent] NY Close + GOLD CUTOFF in 10 Min | NY session ends at midnight ACST. GOLD CUTOFF IN 10 MINUTES - no new Gold positions after 00:00 ACST. Close or protect all positions now.
+[2026-05-11 08:45:05] SENT [high] Monday Planning Session - Open Claude | Good morning! Time for your weekly planning session. Watch the scenario video, paste ForexFactory calendar, then open Claude at 08:30 ACST.
+[2026-05-11 08:45:05] SENT [min] System OK | Alert pipeline healthy. Morning briefing fires in 5 minutes.
+[2026-05-11 15:00:05] SENT [high] 15:00 Signal Check - Open Claude | Time for your pre-session check. Monday - run weekly bias + signal check. London open at 15:30 ACST.
+[2026-05-11 16:50:05] SENT [high] London Close in 10 Min - Review Positions | London prime window closes at 17:00 ACST. Review ALL open positions now. Close, protect, or confirm you are holding with a valid reason.
+[2026-05-12 08:10:22] SENT [default] Daily Briefing - Open Claude | Good morning! Quick daily check-in: scenario video done? Paste today's ForexFactory calendar to Claude. Session starts 15:30 ACST.
+[2026-05-12 08:10:22] FAILED [min] System OK | The process cannot access the file 'C:\Users\mathe\trading-alerts\logs\alert-log.txt' because it is being used by another process.
+[2026-05-12 08:10:33] RETRY OK [min] System OK
+[2026-05-12 15:00:04] SENT [high] 15:00 Signal Check - Open Claude | Time for your pre-session check. Tuesday - prime setup day, check all 3 pairs. London open at 15:30 ACST.
+[2026-05-13 18:19:54] SENT [high] 15:00 Signal Check - Open Claude | Time for your pre-session check. Wednesday - caution day, setups less likely. London open at 15:30 ACST.
+[2026-05-13 18:19:54] FAILED [default] Wednesday Caution | The process cannot access the file 'C:\Users\mathe\trading-alerts\logs\alert-log.txt' because it is being used by another process.
+[2026-05-13 18:20:05] RETRY OK [default] Wednesday Caution
+[2026-05-14 15:00:05] SENT [high] 15:00 Signal Check - Open Claude | Time for your pre-session check. Thursday - prime setup day, check all 3 pairs. London open at 15:30 ACST.
+[2026-05-14 16:50:06] SENT [high] London Close in 10 Min - Review Positions | London prime window closes at 17:00 ACST. Review ALL open positions now. Close, protect, or confirm you are holding with a valid reason.
+[2026-05-15 09:08:07] SENT [default] Daily Briefing - Open Claude | Good morning! Quick daily check-in: scenario video done? Paste today's ForexFactory calendar to Claude. Session starts 15:30 ACST.
+[2026-05-15 09:08:07] FAILED [min] System OK | The process cannot access the file 'C:\Users\mathe\trading-alerts\logs\alert-log.txt' because it is being used by another process.
+[2026-05-15 09:08:18] RETRY OK [min] System OK
+[2026-05-15 15:00:03] SENT [high] 15:00 Signal Check - Open Claude | Time for your pre-session check. Friday - optional session, check conditions first. London open at 15:30 ACST.
+[2026-05-15 16:50:04] SENT [high] London Close in 10 Min - Review Positions | London prime window closes at 17:00 ACST. Review ALL open positions now. Close, protect, or confirm you are holding with a valid reason.
+[2026-05-15 23:50:04] SENT [urgent] NY Close + GOLD CUTOFF in 10 Min | NY session ends at midnight ACST. GOLD CUTOFF IN 10 MINUTES - no new Gold positions after 00:00 ACST. Close or protect all positions now.
+[2026-05-18 07:55:07] SENT [min] System OK | Alert pipeline healthy. Morning briefing fires in 5 minutes.
+[2026-05-18 08:00:05] SENT [high] Monday Planning Session - Open Claude | Good morning! Time for your weekly planning session. Watch the scenario video, paste ForexFactory calendar, then open Claude at 08:30 ACST.
+[2026-05-18 15:00:04] SENT [high] 15:00 Signal Check - Open Claude | Time for your pre-session check. Monday - run weekly bias + signal check. London open at 15:30 ACST.
+[2026-05-18 16:50:04] SENT [high] London Close in 10 Min - Review Positions | London prime window closes at 17:00 ACST. Review ALL open positions now. Close, protect, or confirm you are holding with a valid reason.
+[2026-05-18 23:50:05] SENT [urgent] NY Close + GOLD CUTOFF in 10 Min | NY session ends at midnight ACST. GOLD CUTOFF IN 10 MINUTES - no new Gold positions after 00:00 ACST. Close or protect all positions now.
+[2026-05-19 07:55:19] SENT [min] System OK | Alert pipeline healthy. Morning briefing fires in 5 minutes.
+[2026-05-19 08:00:48] SENT [default] Daily Briefing - Open Claude | Good morning! Quick daily check-in: scenario video done? Paste today's ForexFactory calendar to Claude. Session starts 15:30 ACST.
+[2026-05-19 15:00:05] SENT [high] 15:00 Signal Check - Open Claude | Time for your pre-session check. Tuesday - prime setup day, check all 3 pairs. London open at 15:30 ACST.
+[2026-05-19 16:50:05] SENT [high] London Close in 10 Min - Review Positions | London prime window closes at 17:00 ACST. Review ALL open positions now. Close, protect, or confirm you are holding with a valid reason.
+[2026-05-19 23:50:04] SENT [urgent] NY Close + GOLD CUTOFF in 10 Min | NY session ends at midnight ACST. GOLD CUTOFF IN 10 MINUTES - no new Gold positions after 00:00 ACST. Close or protect all positions now.
+[2026-05-20 07:55:14] SENT [min] System OK | Alert pipeline healthy. Morning briefing fires in 5 minutes.
+[2026-05-20 08:00:05] SENT [default] Daily Briefing - Open Claude | Good morning! Quick daily check-in: scenario video done? Paste today's ForexFactory calendar to Claude. Session starts 15:30 ACST.
