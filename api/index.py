@@ -33,6 +33,13 @@ from database import (  # noqa: E402
     get_error_count_last_hour,
     Trade,
 )
+from position_sizing import (  # noqa: E402
+    PositionQualityRating,
+    TradeSetup,
+    PositionSizer,
+    RiskManagementRules,
+    RiskValidator,
+)
 
 try:
     load_dotenv()
@@ -44,6 +51,11 @@ app = FastAPI(title="TradingView Webhook → Capital.com")
 NTFY_TOPIC = os.getenv("NTFY_TOPIC", "Mathew-Trading-Alerts")
 NTFY_URL = f"https://ntfy.sh/{NTFY_TOPIC}"
 SIMULATE = os.getenv("SIMULATE_TRADES", "true").lower() == "true"
+
+# Position sizing configuration
+ACCOUNT_BALANCE = float(os.getenv("ACCOUNT_BALANCE", "10000.0"))
+TRADE_QUALITY = os.getenv("TRADE_QUALITY", "A").upper()  # A+, A, B, or C
+RISK_MANAGEMENT_RULES = RiskManagementRules()
 
 
 class WebhookPayload(BaseModel):
@@ -60,6 +72,8 @@ class PendingTradeResponse(BaseModel):
     direction: str
     entry_price: float
     stop_price: Optional[float]
+    position_size: Optional[float] = None
+    risk_amount: Optional[float] = None
     created_at: str
     expires_at: str
 
@@ -214,6 +228,45 @@ async def receive_webhook(payload: WebhookPayload, api_key: str = Depends(verify
         trade_id = str(uuid.uuid4())
         expires_at = (datetime.utcnow() + timedelta(minutes=5)).isoformat()
 
+        # Calculate position size and risk
+        position_size = None
+        risk_amount = None
+        validation_msg = ""
+
+        try:
+            # Map quality string to enum
+            quality_map = {
+                "A+": PositionQualityRating.A_PLUS,
+                "A": PositionQualityRating.A,
+                "B": PositionQualityRating.B,
+                "C": PositionQualityRating.C,
+            }
+            quality = quality_map.get(TRADE_QUALITY, PositionQualityRating.A)
+
+            # Create trade setup
+            setup = TradeSetup(
+                entry_price=entry_price,
+                stop_loss=stop_price if stop_price else entry_price,
+                direction=direction,
+                quality=quality,
+                account_balance=ACCOUNT_BALANCE,
+            )
+
+            # Validate position
+            is_valid, validation_msg = RiskValidator.validate_position(setup, RISK_MANAGEMENT_RULES)
+
+            if is_valid:
+                # Calculate position size by quality
+                position_size = PositionSizer.calculate_size_by_quality(quality)
+                risk_amount = setup.account_balance * RISK_MANAGEMENT_RULES.max_risk_per_trade
+            else:
+                # Position failed validation - log but continue queuing for manual review
+                print(f"[WARNING] Position validation failed: {validation_msg}")
+
+        except Exception as e:
+            print(f"[WARNING] Could not calculate position size: {str(e)}")
+            validation_msg = f"Position sizing error: {str(e)}"
+
         insert_pending_trade(
             trade_id=trade_id,
             symbol=payload.symbol,
@@ -221,13 +274,17 @@ async def receive_webhook(payload: WebhookPayload, api_key: str = Depends(verify
             entry_price=entry_price,
             stop_price=stop_price,
             expires_at=expires_at,
+            position_size=position_size,
+            risk_amount=risk_amount,
         )
 
         ntfy_body = (
             f"⏳ APPROVAL REQUIRED\n"
             f"{payload.action.upper()} {payload.symbol}\n"
             f"Entry: {entry_price:.2f}"
-            + (f" | Stop: {stop_price:.2f}" if stop_price else "")
+            + (f" | Stop: {stop_price:.2f}" if stop_price else " | Stop: NONE")
+            + (f"\nSize: {position_size:.2f} lots | Risk: ${risk_amount:.2f}" if position_size else "\nSize: UNPRICED | Risk: UNCALC")
+            + (f"\n⚠️ {validation_msg}" if validation_msg else "")
             + f"\nTrade ID: {trade_id}\n"
             f"Expires: {expires_at}\n"
             f"GET /pending to review or\n"
@@ -309,15 +366,18 @@ async def execute_pending_trade(trade_id: str):
     if not trade_data:
         raise HTTPException(status_code=404, detail=f"Trade {trade_id} not found")
 
+    # Use calculated position size if available, otherwise use default
+    position_size = trade_data.get("position_size") or 1.0
+
     if SIMULATE:
         result = TradeResult(
             success=True,
             deal_reference=f"SIM-{trade_id[:8]}",
-            size=1.0,
+            size=position_size,
             direction=trade_data["direction"],
             epic=trade_data["symbol"],
             message=f"[SIMULATED] {trade_data['direction']} {trade_data['symbol']} "
-                    f"@ {trade_data['entry_price']}",
+                    f"{position_size:.2f}lots @ {trade_data['entry_price']}",
         )
     else:
         if CapitalClient is None:
@@ -328,6 +388,8 @@ async def execute_pending_trade(trade_id: str):
             direction=trade_data["direction"].lower(),
             entry_price=trade_data["entry_price"],
             stop_price=trade_data["stop_price"],
+            # Note: CapitalClient will calculate its own position size based on stop loss
+            # The position_size here is for informational purposes
         )
 
     return result

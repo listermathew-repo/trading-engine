@@ -51,6 +51,8 @@ def init_db() -> None:
             direction TEXT NOT NULL,
             entry_price REAL NOT NULL,
             stop_price REAL,
+            position_size REAL,
+            risk_amount REAL,
             created_at TEXT NOT NULL,
             expires_at TEXT NOT NULL
         )
@@ -73,6 +75,21 @@ def init_db() -> None:
             occurred_at TEXT NOT NULL
         )
     """)
+
+    # Migration: Add position_size and risk_amount columns if they don't exist
+    try:
+        cursor.execute("PRAGMA table_info(pending_trades)")
+        columns = [row[1] for row in cursor.fetchall()]
+
+        if "position_size" not in columns:
+            cursor.execute("ALTER TABLE pending_trades ADD COLUMN position_size REAL")
+            print("[DB] Added position_size column to pending_trades")
+
+        if "risk_amount" not in columns:
+            cursor.execute("ALTER TABLE pending_trades ADD COLUMN risk_amount REAL")
+            print("[DB] Added risk_amount column to pending_trades")
+    except Exception as e:
+        print(f"[DB] Migration warning: {e}")
 
     conn.commit()
     conn.close()
@@ -198,7 +215,9 @@ def insert_pending_trade(
     direction: str,
     entry_price: float,
     stop_price: Optional[float],
-    expires_at: str
+    expires_at: str,
+    position_size: Optional[float] = None,
+    risk_amount: Optional[float] = None
 ) -> None:
     """Insert a pending trade awaiting approval."""
     conn = sqlite3.connect(DB_PATH)
@@ -206,14 +225,16 @@ def insert_pending_trade(
 
     cursor.execute("""
         INSERT INTO pending_trades
-        (id, symbol, direction, entry_price, stop_price, created_at, expires_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
+        (id, symbol, direction, entry_price, stop_price, position_size, risk_amount, created_at, expires_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     """, (
         trade_id,
         symbol,
         direction,
         entry_price,
         stop_price,
+        position_size,
+        risk_amount,
         datetime.utcnow().isoformat(),
         expires_at,
     ))
@@ -228,7 +249,7 @@ def get_pending_trades() -> List[Dict[str, Any]]:
     cursor = conn.cursor()
 
     cursor.execute("""
-        SELECT id, symbol, direction, entry_price, stop_price, created_at, expires_at
+        SELECT id, symbol, direction, entry_price, stop_price, position_size, risk_amount, created_at, expires_at
         FROM pending_trades
         ORDER BY created_at ASC
     """)
@@ -244,8 +265,10 @@ def get_pending_trades() -> List[Dict[str, Any]]:
             "direction": row[2],
             "entry_price": row[3],
             "stop_price": row[4],
-            "created_at": row[5],
-            "expires_at": row[6],
+            "position_size": row[5],
+            "risk_amount": row[6],
+            "created_at": row[7],
+            "expires_at": row[8],
         })
 
     return pending
