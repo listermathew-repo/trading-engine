@@ -138,6 +138,13 @@ class MAFStrategy:
 
         filtered_signals = signals
 
+        # Liquidity sweep filter (if enabled)
+        if config.get('use_sweep_filter', True) and bars:
+            filtered_signals = [
+                s for s in filtered_signals
+                if self._detect_liquidity_sweep(bars, s)
+            ]
+
         # H4 confluence filter (if available)
         if h4_bars:
             h4_bias = self._get_h4_bias(h4_bars, self.h4_ema_period)
@@ -284,6 +291,50 @@ class MAFStrategy:
     def _apply_daily_filter(signal, daily_bias):
         """Apply Daily confluence filter (veto mode)."""
         return daily_bias != 0
+
+    @staticmethod
+    def _detect_liquidity_sweep(bars, signal, lookback=8):
+        """
+        Verify that the FVG entry is at a swept structural level.
+
+        For LONG FVG: Entry level should be at/near the swing low (price reached that level)
+        For SHORT FVG: Entry level should be at/near the swing high (price reached that level)
+
+        A swept level means price actually tested that support/resistance before reversal.
+
+        Args:
+            bars: List of bars (symbol, time, open, high, low, close, volume, h, m)
+            signal: Dict with 'bar_idx' (int), 'type' ('LONG' or 'SHORT'), 'entry_level' (float)
+            lookback: Number of bars to check for swing (default 8)
+
+        Returns:
+            bool: True if entry is at a swept structural level, False otherwise
+        """
+        fvg_bar_idx = signal['bar_idx']
+
+        if fvg_bar_idx < lookback:
+            return True  # Not enough history, allow trade
+
+        # Get bars BEFORE FVG formed
+        lookback_bars = bars[fvg_bar_idx - lookback : fvg_bar_idx]
+
+        if len(lookback_bars) == 0:
+            return True
+
+        if signal['type'] == 'LONG':
+            # For LONG FVG: Entry should be CLOSE to the swing low
+            # This confirms price tested the swing before reversing up
+            swing_low = min(b[4] for b in lookback_bars)  # b[4] = low
+            # Entry within 0.3% of swing low = strong structural level
+            distance = abs(signal['entry_level'] - swing_low) / swing_low
+            return distance < 0.003  # 0.3% tolerance
+        else:  # SHORT
+            # For SHORT FVG: Entry should be CLOSE to the swing high
+            # This confirms price tested the swing before reversing down
+            swing_high = max(b[3] for b in lookback_bars)  # b[3] = high
+            # Entry within 0.3% of swing high = strong structural level
+            distance = abs(signal['entry_level'] - swing_high) / swing_high
+            return distance < 0.003  # 0.3% tolerance
 
 
 # ========== BACKWARD COMPATIBILITY FUNCTIONS ==========
