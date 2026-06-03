@@ -1,0 +1,29 @@
+# EURUSD Configuration Profile
+# Optimized based on Phase 2 backtest results
+# Note: Sweep filter has modest impact on EURUSD (+0.03R)
+
+symbol: capital.com:EURUSD
+description: "Euro vs US Dollar - H4 Counter biased approach"
+
+# Strategy Configuration
+strategy:
+  atr_threshold: 0.25
+  atr_period: 14
+  lookback: 8
+  h4_ema_period: 20
+  daily_lookback: 20
+
+# Filter Configuration
+filters:
+  use_sweep_filter: true         # Modest positive impact (+0.03R)
+  use_bos_filter: false          # Disabled - filters 100%
+  use_h4_filter: true            # H4 Counter: strong baseline improvement
+  h4_filter_mode: counter        # Trade reversals against H4 bias
+  use_daily_filter: false        # Optional, not needed for this pair
+
+# Expected Performance (from Phase 2 backtest)
+expectations:
+  expectancy: -0.25R             # With Sweep + H4 Counter
+  trades: 44                      # Over 2-year period
+  win_rate: 25.0%
+  comment: "H4 Counter remains most reliable approach for EURUSD"

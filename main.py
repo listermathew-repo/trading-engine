@@ -4,6 +4,7 @@ Orchestrates the entire backtest pipeline using StrategyInterface.
 Runs: Fetch → Strategy.generate_signals() → Strategy.filter_signals() → Engine.simulate_execution() → Report Metrics
 
 This layer is strategy-agnostic: you can swap strategies without changing this code.
+Supports profile-based configuration via YAML files in config/ directory.
 """
 
 import duckdb
@@ -11,65 +12,114 @@ from typing import Dict, Tuple, List, Any, Optional
 from strategy import MAFStrategy
 from strategy_interface import StrategyInterface
 from engine import simulate_limit_orders, calculate_expectancy
+from config_loader import ConfigLoader
 
 
 def run_backtest(
     symbol: str = 'capital.com:EURUSD',
     db_path: str = 'backtest_trading.duckdb.backup',
     strategy: Optional[StrategyInterface] = None,
-    use_sweep_filter: bool = True,
-    use_bos_filter: bool = False,
-    use_h4_filter: bool = False,
-    h4_filter_mode: str = 'aligned',
-    use_daily_filter: bool = False,
+    use_profile_config: bool = True,
+    use_sweep_filter: Optional[bool] = None,
+    use_bos_filter: Optional[bool] = None,
+    use_h4_filter: Optional[bool] = None,
+    h4_filter_mode: Optional[str] = None,
+    use_daily_filter: Optional[bool] = None,
 ) -> Tuple[Optional[Dict[str, Any]], Optional[List[Dict[str, Any]]]]:
     """
     Run complete backtest pipeline using a pluggable strategy.
+
+    Supports two configuration modes:
+    1. Profile-based (default): Load symbol-specific config from YAML files
+    2. Manual: Pass filter parameters directly
 
     Args:
         symbol: Trading pair (e.g., 'capital.com:EURUSD')
         db_path: Path to DuckDB file
         strategy: StrategyInterface implementation (defaults to MAFStrategy)
-        use_sweep_filter: Enable liquidity sweep detection filter
-        use_bos_filter: Enable break of structure filter (disabled by default)
-        use_h4_filter: Enable H4 confluence filter
-        h4_filter_mode: 'aligned' or 'counter'
-        use_daily_filter: Enable Daily confluence filter
+        use_profile_config: Load config from YAML profiles (default: True)
+        use_sweep_filter: Override sweep filter setting
+        use_bos_filter: Override BOS filter setting
+        use_h4_filter: Override H4 filter setting
+        h4_filter_mode: Override H4 filter mode ('aligned' or 'counter')
+        use_daily_filter: Override daily filter setting
 
     Returns:
         (metrics dict, trades list) or (None, None) on error
     """
-    # Use default strategy if not provided
+    # Load configuration
+    filter_config = {}
+    strategy_config = {
+        'atr_threshold': 0.25,
+        'atr_period': 14,
+        'lookback': 8,
+        'h4_ema_period': 20,
+        'daily_lookback': 20,
+    }
+
+    if use_profile_config:
+        # Load profile-based configuration
+        loader = ConfigLoader()
+        profile_config = loader.get_full_config(symbol)
+
+        # Merge strategy config from profile
+        if 'strategy' in profile_config:
+            strategy_config.update(profile_config['strategy'])
+
+        # Use filter config from profile
+        if 'filters' in profile_config:
+            filter_config = profile_config['filters'].copy()
+
+    # Override with explicit parameters if provided
+    if use_sweep_filter is not None:
+        filter_config['use_sweep_filter'] = use_sweep_filter
+    if use_bos_filter is not None:
+        filter_config['use_bos_filter'] = use_bos_filter
+    if use_h4_filter is not None:
+        filter_config['use_h4_filter'] = use_h4_filter
+    if h4_filter_mode is not None:
+        filter_config['h4_filter_mode'] = h4_filter_mode
+    if use_daily_filter is not None:
+        filter_config['use_daily_filter'] = use_daily_filter
+
+    # Set defaults if not loaded from profile or provided explicitly
+    filter_config.setdefault('use_sweep_filter', False)
+    filter_config.setdefault('use_bos_filter', False)
+    filter_config.setdefault('use_h4_filter', False)
+    filter_config.setdefault('h4_filter_mode', 'aligned')
+    filter_config.setdefault('use_daily_filter', False)
+
+    # Merge filter config into strategy config
+    strategy_config.update(filter_config)
+
+    # Use provided strategy or create default
     if strategy is None:
-        strategy = MAFStrategy({
-            'atr_threshold': 0.25,
-            'atr_period': 14,
-            'lookback': 8,
-            'h4_ema_period': 20,
-            'daily_lookback': 20,
-            'use_sweep_filter': use_sweep_filter,
-            'use_bos_filter': use_bos_filter,
-            'h4_filter_mode': h4_filter_mode,
-            'use_daily_filter': use_daily_filter,
-        })
+        strategy = MAFStrategy(strategy_config)
 
     # Format output label
     filter_parts = []
-    if use_sweep_filter:
+    if filter_config.get('use_sweep_filter'):
         filter_parts.append("Sweep")
-    if use_bos_filter:
+    if filter_config.get('use_bos_filter'):
         filter_parts.append("BOS")
-    if use_h4_filter:
-        filter_parts.append(f"H4-{h4_filter_mode.upper()}")
-    if use_daily_filter:
+    if filter_config.get('use_h4_filter'):
+        filter_parts.append(f"H4-{filter_config.get('h4_filter_mode', 'aligned').upper()}")
+    if filter_config.get('use_daily_filter'):
         filter_parts.append("Daily")
 
     filter_label = " (UNFILTERED)"
     if filter_parts:
         filter_label = f" ({' + '.join(filter_parts)})"
 
+    # Add profile indicator if loaded from config
+    profile_indicator = ""
+    if use_profile_config:
+        loader = ConfigLoader()
+        symbol_key = loader.get_symbol_from_config(symbol)
+        profile_indicator = f" [Profile: {symbol_key}]"
+
     print(f"\n{'='*140}")
-    print(f"BACKTEST: {symbol}{filter_label}")
+    print(f"BACKTEST: {symbol}{filter_label}{profile_indicator}")
     print(f"{'='*140}")
 
     # STAGE 1: Fetch data
@@ -206,19 +256,20 @@ def run_all_tests(
     symbols: Optional[List[str]] = None,
     db_path: str = 'backtest_trading.duckdb.backup',
     strategy: Optional[StrategyInterface] = None,
+    use_profiles: bool = True,
 ) -> None:
     """
-    Run comprehensive backtest suite using pluggable strategy.
+    Run comprehensive backtest suite using pluggable strategy and profile-based configs.
 
-    Tests three confluence approaches:
-    1. Unfiltered baseline (no filters)
-    2. H4 Counter filter (trade reversals against H4 bias)
-    3. H4 Counter + Daily confluence (both filters active)
+    Supports two modes:
+    1. Profile-based (default): Load symbol-specific configs from config/ directory
+    2. Manual: Run hardcoded test scenarios
 
     Args:
         symbols: List of symbols to test (defaults to EURUSD, AUDUSD)
         db_path: Path to DuckDB file
         strategy: StrategyInterface implementation (defaults to MAFStrategy)
+        use_profiles: Load symbol-specific configurations from YAML profiles
     """
     if symbols is None:
         symbols = ["capital.com:EURUSD", "capital.com:AUDUSD"]
@@ -227,16 +278,44 @@ def run_all_tests(
         strategy = MAFStrategy()
 
     print("="*140)
-    print("MARKET ALIGNMENT FRAMEWORK — FINAL BACKTEST")
-    print("Testing: Unfiltered vs H4 Counter vs (H4 Counter + Daily)")
+    print("MARKET ALIGNMENT FRAMEWORK — COMPREHENSIVE BACKTEST")
+    if use_profiles:
+        print("Configuration: Profile-based (from config/ directory)")
+    else:
+        print("Configuration: Manual (hardcoded test scenarios)")
     print("="*140)
 
+    if use_profiles:
+        # Profile-based: Run with symbol-specific configurations
+        print("\n\nTEST 1: SYMBOL-SPECIFIC PROFILES")
+        print("=" * 140)
+        all_trades_profiles = []
+        for symbol in symbols:
+            metrics, trades = run_backtest(symbol, db_path, strategy=strategy, use_profile_config=True)
+            if trades:
+                all_trades_profiles.extend(trades)
+
+        profile_agg = calculate_expectancy(all_trades_profiles)
+        print(f"\n{'='*140}")
+        print(f"PROFILE-BASED RESULTS")
+        print(f"{'='*140}")
+        print(f"Total Trades: {profile_agg['total_trades']:,}")
+        print(f"Win Rate: {profile_agg['win_rate']:.1f}%")
+        print(f"EXPECTANCY: {profile_agg['expectancy_r']:+.2f}R per trade")
+        if profile_agg['expectancy_r'] > 0:
+            print(f"STATUS: PROFITABLE!")
+        else:
+            print(f"STATUS: NOT PROFITABLE (yet)")
+        print(f"{'='*140}")
+        return
+
+    # Manual mode: Run hardcoded test scenarios
     # Test 1: Baseline (no filters)
     print("\n\nTEST 1: UNFILTERED BASELINE")
     print("=" * 140)
     all_trades_baseline = []
     for symbol in symbols:
-        metrics, trades = run_backtest(symbol, db_path, strategy=strategy)
+        metrics, trades = run_backtest(symbol, db_path, strategy=strategy, use_profile_config=False)
         if trades:
             all_trades_baseline.extend(trades)
 
@@ -247,6 +326,7 @@ def run_all_tests(
     for symbol in symbols:
         metrics, trades = run_backtest(
             symbol, db_path, strategy=strategy,
+            use_profile_config=False,
             use_h4_filter=True, h4_filter_mode='counter'
         )
         if trades:
@@ -259,6 +339,7 @@ def run_all_tests(
     for symbol in symbols:
         metrics, trades = run_backtest(
             symbol, db_path, strategy=strategy,
+            use_profile_config=False,
             use_h4_filter=True, h4_filter_mode='counter',
             use_daily_filter=True
         )

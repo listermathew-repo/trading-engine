@@ -1,0 +1,29 @@
+# Default Configuration Profile
+# Used as fallback for symbols without specific profiles
+# Conservative settings based on unfiltered baseline
+
+symbol: "unknown"
+description: "Default profile - conservative settings for unknown symbols"
+
+# Strategy Configuration
+strategy:
+  atr_threshold: 0.25
+  atr_period: 14
+  lookback: 8
+  h4_ema_period: 20
+  daily_lookback: 20
+
+# Filter Configuration (Conservative - H4 Counter only)
+filters:
+  use_sweep_filter: false        # Disabled by default (instrument-dependent)
+  use_bos_filter: false          # Disabled - filters 100%
+  use_h4_filter: true            # H4 Counter: reliable +0.09R improvement
+  h4_filter_mode: counter        # Trade reversals against H4 bias
+  use_daily_filter: false        # Disabled by default
+
+# Expected Performance
+expectations:
+  expectancy: -0.14R             # H4 Counter baseline improvement
+  trades: null                    # Unknown
+  win_rate: 28.8%                # H4 Counter aggregated win rate
+  comment: "Conservative defaults - customize per symbol for better results"
