@@ -1,9 +1,9 @@
-# FTMO Shadow Challenge Tracker
-# Mirrors FTMO $100k account rules against your real Capital.com trades
+# Prop Firm Shadow Challenge Tracker
+# Mirrors Prop Firm $100k account rules against your real Capital.com trades
 # Start date: April 21, 2026
-# Reset this every time you formally attempt a real FTMO challenge
+# Reset this every time you formally attempt a real Prop Firm challenge
 
-## CHALLENGE PARAMETERS (FTMO $100k Swing Account)
+## CHALLENGE PARAMETERS (Prop Firm $100k Swing Account)
 - Starting balance:    $100,000 (simulated)
 - Profit target:       $10,000 (10%) — reach this to pass Phase 1
 - Daily loss limit:    $5,000 (5%) — breach this = FAIL day (note it)
@@ -12,7 +12,7 @@
 - Account floor:       $90,000 (if equity hits this = challenge over)
 
 ## SCALING FACTOR
-Your real account: $80,000 | FTMO challenge: $100,000
+Your real account: $80,000 | Prop Firm challenge: $100,000
 Scale factor: 1.25x (multiply your real $ result by 1.25 for shadow tracking)
 Example: Real +$400 profit = Shadow +$500 (400 × 1.25)
 
@@ -64,11 +64,11 @@ Example: Real +$400 profit = Shadow +$500 (400 × 1.25)
 [ ] Psychology score was 3+ on all entry days
 [ ] Entry checklist completed 100% of entry days
 
-If all 6 boxes checked → GREEN LIGHT to attempt real FTMO $100k Swing challenge.
+If all 6 boxes checked → GREEN LIGHT to attempt real Prop Firm $100k Swing challenge.
 
 ---
 
-## REAL FTMO $100K CHALLENGE COST REFERENCE
+## REAL Prop Firm $100K CHALLENGE COST REFERENCE
 | Account size | Cost (EUR) | Profit target | Daily DD | Max DD |
 |-------------|-----------|--------------|---------|--------|
 | $25,000 | €155 | $2,500 | $1,250 | $2,500 |
@@ -80,9 +80,9 @@ Fee is REFUNDED with your first payout. Net cost = $0 if you pass and get paid.
 
 ---
 
-## DAY 1 (FTMO) vs DAY 2 (FUTURES) — DECISION FRAMEWORK
+## DAY 1 (Prop Firm) vs DAY 2 (FUTURES) — DECISION FRAMEWORK
 
-### Day 1: FTMO Swing $100k (~€540 one-time)
+### Day 1: Prop Firm Swing $100k (~€540 one-time)
 - Exact instruments: XAUUSD spot, AUDUSD, EURUSD — zero adaptation
 - Swing account: no overnight restrictions, no news restrictions
 - Profit split: 80% (you) → scales to 90%
@@ -91,11 +91,11 @@ Fee is REFUNDED with your first payout. Net cost = $0 if you pass and get paid.
 ### Day 2: FundedNext Futures Rapid $50k (~$150 one-time)
 - Instruments: MGC (micro gold futures), 6A (AUD/USD futures), 6E (EUR/USD futures)
 - No daily drawdown limit — most forgiving for London-open momentum style
-- Apply when: FTMO attempt fails, or running parallel to learn futures execution
+- Apply when: Prop Firm attempt fails, or running parallel to learn futures execution
 
 ---
 
 ## NOTES
 - Update this file after EVERY session — takes 2 minutes
 - Review weekly in the Sunday planning session
-- If the shadow tracker shows 2+ consecutive months of passing → schedule the real FTMO challenge
+- If the shadow tracker shows 2+ consecutive months of passing → schedule the real Prop Firm challenge
