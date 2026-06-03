@@ -139,6 +139,9 @@ class CapitalAPI:
                         'offer': market.get('offer'),
                         'updateTime': market.get('updateTime'),
                     }
+                else:
+                    logger.error(f"No market details found for {epic}")
+                    return None
             else:
                 logger.error(f"Market data failed: {response.status_code}")
                 return None
