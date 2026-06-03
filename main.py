@@ -17,6 +17,8 @@ def run_backtest(
     symbol: str = 'capital.com:EURUSD',
     db_path: str = 'backtest_trading.duckdb.backup',
     strategy: Optional[StrategyInterface] = None,
+    use_sweep_filter: bool = True,
+    use_bos_filter: bool = False,
     use_h4_filter: bool = False,
     h4_filter_mode: str = 'aligned',
     use_daily_filter: bool = False,
@@ -28,6 +30,8 @@ def run_backtest(
         symbol: Trading pair (e.g., 'capital.com:EURUSD')
         db_path: Path to DuckDB file
         strategy: StrategyInterface implementation (defaults to MAFStrategy)
+        use_sweep_filter: Enable liquidity sweep detection filter
+        use_bos_filter: Enable break of structure filter (disabled by default)
         use_h4_filter: Enable H4 confluence filter
         h4_filter_mode: 'aligned' or 'counter'
         use_daily_filter: Enable Daily confluence filter
@@ -43,18 +47,26 @@ def run_backtest(
             'lookback': 8,
             'h4_ema_period': 20,
             'daily_lookback': 20,
+            'use_sweep_filter': use_sweep_filter,
+            'use_bos_filter': use_bos_filter,
             'h4_filter_mode': h4_filter_mode,
             'use_daily_filter': use_daily_filter,
         })
 
     # Format output label
+    filter_parts = []
+    if use_sweep_filter:
+        filter_parts.append("Sweep")
+    if use_bos_filter:
+        filter_parts.append("BOS")
+    if use_h4_filter:
+        filter_parts.append(f"H4-{h4_filter_mode.upper()}")
+    if use_daily_filter:
+        filter_parts.append("Daily")
+
     filter_label = " (UNFILTERED)"
-    if use_h4_filter and use_daily_filter:
-        filter_label = f" (H4 {h4_filter_mode.upper()} + Daily)"
-    elif use_h4_filter:
-        filter_label = f" (H4 {h4_filter_mode.upper()})"
-    elif use_daily_filter:
-        filter_label = " (Daily Only)"
+    if filter_parts:
+        filter_label = f" ({' + '.join(filter_parts)})"
 
     print(f"\n{'='*140}")
     print(f"BACKTEST: {symbol}{filter_label}")
@@ -137,11 +149,22 @@ def run_backtest(
         'h4_bars': h4_data,
         'daily_bars': daily_data,
         'config': {
+            'use_sweep_filter': use_sweep_filter,
+            'use_bos_filter': use_bos_filter,
             'h4_filter_mode': h4_filter_mode,
             'use_daily_filter': use_daily_filter,
         }
     }
-    filtered_signals = strategy.filter_signals(signals, filter_context) if (use_h4_filter or use_daily_filter) else signals
+    # Apply filters if any are enabled
+    should_filter = use_sweep_filter or use_bos_filter or use_h4_filter or use_daily_filter
+    filtered_signals = strategy.filter_signals(signals, filter_context) if should_filter else signals
+
+    # Report filtering results
+    if should_filter and len(filtered_signals) < len(signals):
+        reduction = (1 - len(filtered_signals) / len(signals)) * 100
+        print(f"Applied filters: {len(filtered_signals):,} signals remain ({reduction:.1f}% filtered)")
+    elif should_filter:
+        print(f"Applied filters: {len(filtered_signals):,} signals remain (no reduction)")
 
     # STAGE 4: Execute trades via engine
     trades = simulate_limit_orders(
