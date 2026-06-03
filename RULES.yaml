@@ -1,0 +1,93 @@
+# MAF Backtest System — Configuration Rules
+# All hardcoded parameters extracted to YAML for easy tuning
+
+backtest:
+  # Time range for historical data
+  start_date: "2024-06-02"
+  end_date: "2026-06-02"
+
+  # Database connection
+  database_path: "backtest_trading.duckdb.backup"
+
+  # FVG Detection Settings
+  fvg_detection:
+    atr_threshold: 0.25  # Minimum gap size as % of ATR (0.25 = 25% of ATR)
+    atr_period: 14       # Lookback period for ATR calculation
+    min_gap_pips: 0      # Minimum gap in pips (unfiltered if 0)
+
+  # Risk & Reward Settings
+  risk_reward:
+    rr_ratio: 2.0        # Risk-to-reward ratio (2.0 = 1:2, entry at FVG, TP 2x risk)
+    position_size_r: 1.0 # Risk amount per trade (in R units)
+
+  # Entry Logic (Limit Order Mitigation)
+  entry:
+    type: "limit_order"  # Entry method: limit_order (wait for retrace) or market (breakout)
+    max_wait_bars: 96    # Maximum bars to wait for limit order fill (M15 = 24 hours)
+
+  # Stop Loss Calculation
+  stop_loss:
+    method: "swing"      # Method: swing (structural) or atr (volatility-based)
+    lookback: 8          # Lookback period for swing high/low calculation
+    buffer_pips: 1       # Buffer distance from swing (1 pip = 0.0001)
+
+  # H4 Confluence Filter
+  h4_confluence:
+    enabled: true
+    ema_period: 20       # EMA period for H4 trend determination
+    filter_mode: "counter"  # Mode: "aligned" (trade with trend) or "counter" (trade reversals)
+
+  # Daily Confluence Filter (optional)
+  daily_confluence:
+    enabled: false       # Disable for now (too restrictive)
+    lookback: 20         # Lookback for swing highs/lows
+    filter_mode: "veto"  # Mode: "veto" (skip neutral only) or "confirm" (must match direction)
+
+# Confluence Filters (for future implementation)
+confluence:
+  liquidity_sweep:
+    enabled: false       # TODO: Implement sweep detection
+    threshold: 0.5       # % of swing that must be swept
+
+  break_of_structure:
+    enabled: false       # TODO: Implement structure validation
+    threshold: 0.1       # Minimum structure break size
+
+  volume_filter:
+    enabled: false       # TODO: Implement volume analysis
+    min_volume_percentile: 50  # Minimum volume vs recent average
+
+# Timeframe Hierarchy
+timeframes:
+  execution: "M15"       # Entry signals from M15
+  confirmation: "H1"     # Confirmation from H1 (future)
+  bias: "H4"             # Directional bias from H4
+  context: "D"           # Trend context from Daily
+
+# Symbols to Backtest
+symbols:
+  - "capital.com:EURUSD"
+  - "capital.com:AUDUSD"
+  # - "XAUUSD"          # TODO: Add when data available
+  # - "BTCUSD"          # TODO: Add when data available
+
+# Output & Reporting
+output:
+  export_trades: true        # Export all trades to markdown table
+  max_trades_display: 50     # Show first N trades in report
+  confidence_level: 0.95     # Statistical confidence for metrics
+
+# Backtesting Mode
+mode: "historical"           # Mode: historical, replay, or paper
+slippage:
+  enabled: false             # Disable for now (assume perfect fills)
+  pips: 0.5                  # Slippage in pips per trade
+spread:
+  enabled: false             # Disable for now (assume no spread cost)
+  pips: 0.2                  # Bid-ask spread in pips
+
+# Performance Targets
+targets:
+  breakeven_win_rate: 0.333  # 33.3% win rate for 1:2 R:R
+  target_expectancy: 0.20    # Target +0.20R per trade
+  current_expectancy: -0.16  # Current best (H4 Counter)
