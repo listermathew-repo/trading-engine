@@ -1,19 +1,20 @@
-import os
-from fastapi import HTTPException, Header
-from typing import Optional
+"""
+Authentication module for webhook API key validation.
+"""
+
+from fastapi import HTTPException, Depends
+from fastapi.security import APIKeyHeader
 
 
-def verify_api_key(x_api_key: Optional[str] = Header(None)) -> str:
-    """FastAPI dependency to validate webhook API key."""
-    expected_key = os.getenv("WEBHOOK_API_KEY")
+api_key_header = APIKeyHeader(name="X-API-Key")
 
-    if not expected_key:
-        raise HTTPException(status_code=500, detail="Webhook API key not configured")
 
-    if not x_api_key:
-        raise HTTPException(status_code=401, detail="Missing X-API-Key header")
-
-    if x_api_key != expected_key:
+async def verify_api_key(api_key: str = Depends(api_key_header)) -> str:
+    """Verify incoming webhook API key."""
+    import os
+    valid_key = os.getenv("WEBHOOK_API_KEY", "")
+    
+    if not api_key or api_key != valid_key:
         raise HTTPException(status_code=401, detail="Invalid API key")
-
-    return x_api_key
+    
+    return api_key
