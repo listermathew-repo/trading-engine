@@ -145,6 +145,13 @@ class MAFStrategy:
                 if self._detect_liquidity_sweep(bars, s)
             ]
 
+        # Break of structure filter (if enabled - disabled by default pending refinement)
+        if config.get('use_bos_filter', False) and bars:
+            filtered_signals = [
+                s for s in filtered_signals
+                if self._confirm_break_of_structure(bars, s)
+            ]
+
         # H4 confluence filter (if available)
         if h4_bars:
             h4_bias = self._get_h4_bias(h4_bars, self.h4_ema_period)
@@ -291,6 +298,53 @@ class MAFStrategy:
     def _apply_daily_filter(signal, daily_bias):
         """Apply Daily confluence filter (veto mode)."""
         return daily_bias != 0
+
+    @staticmethod
+    def _confirm_break_of_structure(bars, signal, lookback=8):
+        """
+        Verify entry is at the edge of recent structure, not inside the range.
+
+        For LONG FVG: Entry should be at/above the range high
+        (confirming upward structure break, not an inside bar).
+
+        For SHORT FVG: Entry should be at/below the range low
+        (confirming downward structure break, not an inside bar).
+
+        This filters out weak signals where the FVG forms inside recent trading range.
+
+        Args:
+            bars: List of bars (symbol, time, open, high, low, close, volume, h, m)
+            signal: Dict with 'bar_idx' (int), 'type' ('LONG' or 'SHORT'), 'entry_level' (float)
+            lookback: Number of bars to check for structure (default 8)
+
+        Returns:
+            bool: True if BOS confirmed (at range edge), False if inside range
+        """
+        fvg_bar_idx = signal['bar_idx']
+
+        if fvg_bar_idx < lookback:
+            return True  # Not enough history, allow trade
+
+        # Get bars BEFORE FVG formed
+        lookback_bars = bars[max(0, fvg_bar_idx - lookback) : fvg_bar_idx]
+
+        if len(lookback_bars) < 2:
+            return True  # Not enough bars to form a range
+
+        # Find the extremes of the lookback range
+        range_low = min(b[4] for b in lookback_bars)   # b[4] = low
+        range_high = max(b[3] for b in lookback_bars)  # b[3] = high
+
+        # For LONG FVG: Entry (low) should be at or above the recent high
+        # This confirms price broke above recent resistance
+        if signal['type'] == 'LONG':
+            tolerance = (range_high - range_low) * 0.001  # 0.1% tolerance
+            return signal['entry_level'] >= (range_high - tolerance)
+        else:  # SHORT
+            # Entry (high) should be at or below the recent low
+            # This confirms price broke below recent support
+            tolerance = (range_high - range_low) * 0.001  # 0.1% tolerance
+            return signal['entry_level'] <= (range_low + tolerance)
 
     @staticmethod
     def _detect_liquidity_sweep(bars, signal, lookback=8):

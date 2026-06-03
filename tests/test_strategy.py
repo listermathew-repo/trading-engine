@@ -216,12 +216,50 @@ class TestPhase2Readiness:
             f"Expected 0.5-15% reduction, got {reduction:.1f}%"
         )
 
-    def test_structure_validation_placeholder(self):
+    def test_break_of_structure_placeholder(self):
         """
-        TODO: Implement break of structure confirmation
-        Expected: +0.03-0.05R improvement
+        Layer 2: Break of Structure (BOS) confirmation
+
+        Currently disabled (use_bos_filter=False by default).
+
+        The BOS filter algorithm needs refinement:
+        - Current logic filters 100% of signals (too strict)
+        - FVG entry levels are gap boundaries, not necessarily beyond ranges
+        - BOS logic needs to account for how gaps form structurally
+
+        TODO: Refine BOS algorithm to detect proper structure breaks
+        Expected gain: +0.03-0.05R (once implemented correctly)
+
+        For now, BOS filter is available but disabled.
+        Phase 2a (sweep detection) is the active layer 2 filter.
         """
-        pass
+        db = duckdb.connect('backtest_trading.duckdb.backup')
+        m15_data = db.execute(
+            """
+            SELECT symbol, time, open, high, low, close, volume,
+              EXTRACT(HOUR FROM time) as hour_utc,
+              EXTRACT(MINUTE FROM time) as minute_utc
+            FROM ohlcv
+            WHERE symbol = 'capital.com:EURUSD' AND timeframe = 'M15'
+            ORDER BY time
+            """
+        ).fetchall()
+        db.close()
+
+        # Verify BOS method exists and is callable
+        strategy = MAFStrategy()
+        assert hasattr(strategy, '_confirm_break_of_structure'), "BOS method missing"
+        assert callable(strategy._confirm_break_of_structure), "BOS method not callable"
+
+        # Placeholder test: verify the method doesn't crash
+        signals = detect_fvgs(m15_data, atr_threshold=0.25)
+        if len(signals) > 0:
+            test_signal = signals[0]
+            # Should not raise an exception
+            result = strategy._confirm_break_of_structure(m15_data, test_signal)
+            assert isinstance(result, bool), "BOS should return boolean"
+
+        print(f"\n✓ BOS confirmation method present (disabled, pending algorithm refinement)")
 
 
 if __name__ == '__main__':
