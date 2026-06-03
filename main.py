@@ -1,21 +1,53 @@
 """
-MAIN MODULE
-Orchestrates the entire backtest pipeline.
-Runs: Fetch → Detect Signals → Simulate Execution (±H4 filter) → Report Metrics
+MAIN MODULE — ORCHESTRATION LAYER
+Orchestrates the entire backtest pipeline using StrategyInterface.
+Runs: Fetch → Strategy.generate_signals() → Strategy.filter_signals() → Engine.simulate_execution() → Report Metrics
+
+This layer is strategy-agnostic: you can swap strategies without changing this code.
 """
 
 import duckdb
-from strategy import detect_fvgs
-from engine import simulate_limit_orders, calculate_expectancy, export_trade_log_markdown
+from typing import Dict, Tuple, List, Any, Optional
+from strategy import MAFStrategy
+from strategy_interface import StrategyInterface
+from engine import simulate_limit_orders, calculate_expectancy
 
 
-def run_backtest(symbol='capital.com:EURUSD', db_path='backtest_trading.duckdb.backup', use_h4_filter=False, h4_filter_mode='aligned', use_daily_filter=False):
+def run_backtest(
+    symbol: str = 'capital.com:EURUSD',
+    db_path: str = 'backtest_trading.duckdb.backup',
+    strategy: Optional[StrategyInterface] = None,
+    use_h4_filter: bool = False,
+    h4_filter_mode: str = 'aligned',
+    use_daily_filter: bool = False,
+) -> Tuple[Optional[Dict[str, Any]], Optional[List[Dict[str, Any]]]]:
     """
-    Run complete backtest pipeline with optional H4 and Daily confluence filters.
+    Run complete backtest pipeline using a pluggable strategy.
 
-    Input: Symbol, DuckDB path, H4 filter flag, filter mode, Daily filter flag
-    Output: (metrics dict, trades list)
+    Args:
+        symbol: Trading pair (e.g., 'capital.com:EURUSD')
+        db_path: Path to DuckDB file
+        strategy: StrategyInterface implementation (defaults to MAFStrategy)
+        use_h4_filter: Enable H4 confluence filter
+        h4_filter_mode: 'aligned' or 'counter'
+        use_daily_filter: Enable Daily confluence filter
+
+    Returns:
+        (metrics dict, trades list) or (None, None) on error
     """
+    # Use default strategy if not provided
+    if strategy is None:
+        strategy = MAFStrategy({
+            'atr_threshold': 0.25,
+            'atr_period': 14,
+            'lookback': 8,
+            'h4_ema_period': 20,
+            'daily_lookback': 20,
+            'h4_filter_mode': h4_filter_mode,
+            'use_daily_filter': use_daily_filter,
+        })
+
+    # Format output label
     filter_label = " (UNFILTERED)"
     if use_h4_filter and use_daily_filter:
         filter_label = f" (H4 {h4_filter_mode.upper()} + Daily)"
@@ -29,6 +61,7 @@ def run_backtest(symbol='capital.com:EURUSD', db_path='backtest_trading.duckdb.b
     print(f"{'='*140}")
 
     # STAGE 1: Fetch data
+    db = None
     try:
         db = duckdb.connect(db_path)
     except Exception as e:
@@ -49,7 +82,8 @@ def run_backtest(symbol='capital.com:EURUSD', db_path='backtest_trading.duckdb.b
     except Exception as e:
         print(f"ERROR: Cannot fetch M15 data for {symbol}")
         print(f"  {e}")
-        db.close()
+        if db:
+            db.close()
         return None, None
 
     print(f"Loaded {len(m15_data):,} M15 bars")
@@ -90,13 +124,36 @@ def run_backtest(symbol='capital.com:EURUSD', db_path='backtest_trading.duckdb.b
             print(f"WARNING: Could not fetch Daily data for {symbol}")
             daily_data = None
 
-    # STAGE 2: Detect signals
-    signals = detect_fvgs(m15_data, atr_threshold=0.25)
+    if db:
+        db.close()
+
+    # STAGE 2: Generate signals using strategy
+    signals = strategy.generate_signals(m15_data)
     print(f"Detected {len(signals):,} FVG signals (unfiltered, gap > 0 pips)")
 
-    # STAGE 3: Simulate execution (with optional H4/Daily filters)
-    trades = simulate_limit_orders(m15_data, signals, h4_bars=h4_data, daily_bars=daily_data, max_wait_bars=96,
-                                  use_h4_filter=use_h4_filter, h4_filter_mode=h4_filter_mode, use_daily_filter=use_daily_filter)
+    # STAGE 3: Filter signals using strategy
+    filter_context = {
+        'bars': m15_data,
+        'h4_bars': h4_data,
+        'daily_bars': daily_data,
+        'config': {
+            'h4_filter_mode': h4_filter_mode,
+            'use_daily_filter': use_daily_filter,
+        }
+    }
+    filtered_signals = strategy.filter_signals(signals, filter_context) if (use_h4_filter or use_daily_filter) else signals
+
+    # STAGE 4: Execute trades via engine
+    trades = simulate_limit_orders(
+        m15_data,
+        filtered_signals,
+        h4_bars=h4_data,
+        daily_bars=daily_data,
+        max_wait_bars=96,
+        use_h4_filter=use_h4_filter,
+        h4_filter_mode=h4_filter_mode,
+        use_daily_filter=use_daily_filter
+    )
     print(f"Generated {len(trades):,} closed trades")
 
     # STAGE 4: Report metrics
@@ -119,41 +176,56 @@ def run_backtest(symbol='capital.com:EURUSD', db_path='backtest_trading.duckdb.b
     else:
         print(f"  STATUS: NOT PROFITABLE")
 
-    db.close()
-
     return metrics, trades
 
 
-def run_all_tests(symbols=None, db_path='backtest_trading.duckdb.backup'):
+def run_all_tests(
+    symbols: Optional[List[str]] = None,
+    db_path: str = 'backtest_trading.duckdb.backup',
+    strategy: Optional[StrategyInterface] = None,
+) -> None:
     """
-    Run comprehensive backtest suite:
-    1. Unfiltered baseline
-    2. H4 Counter filter (best so far)
-    3. H4 Counter + Daily confluence (hypothesis: should push to positive)
+    Run comprehensive backtest suite using pluggable strategy.
+
+    Tests three confluence approaches:
+    1. Unfiltered baseline (no filters)
+    2. H4 Counter filter (trade reversals against H4 bias)
+    3. H4 Counter + Daily confluence (both filters active)
+
+    Args:
+        symbols: List of symbols to test (defaults to EURUSD, AUDUSD)
+        db_path: Path to DuckDB file
+        strategy: StrategyInterface implementation (defaults to MAFStrategy)
     """
     if symbols is None:
         symbols = ["capital.com:EURUSD", "capital.com:AUDUSD"]
+
+    if strategy is None:
+        strategy = MAFStrategy()
 
     print("="*140)
     print("MARKET ALIGNMENT FRAMEWORK — FINAL BACKTEST")
     print("Testing: Unfiltered vs H4 Counter vs (H4 Counter + Daily)")
     print("="*140)
 
-    # Test 1: Baseline
+    # Test 1: Baseline (no filters)
     print("\n\nTEST 1: UNFILTERED BASELINE")
     print("=" * 140)
     all_trades_baseline = []
     for symbol in symbols:
-        metrics, trades = run_backtest(symbol, db_path)
+        metrics, trades = run_backtest(symbol, db_path, strategy=strategy)
         if trades:
             all_trades_baseline.extend(trades)
 
-    # Test 2: H4 Counter (best from previous run)
+    # Test 2: H4 Counter filter (best approach so far)
     print("\n\nTEST 2: H4 COUNTER FILTER")
     print("=" * 140)
     all_trades_h4_counter = []
     for symbol in symbols:
-        metrics, trades = run_backtest(symbol, db_path, use_h4_filter=True, h4_filter_mode='counter')
+        metrics, trades = run_backtest(
+            symbol, db_path, strategy=strategy,
+            use_h4_filter=True, h4_filter_mode='counter'
+        )
         if trades:
             all_trades_h4_counter.extend(trades)
 
@@ -162,7 +234,11 @@ def run_all_tests(symbols=None, db_path='backtest_trading.duckdb.backup'):
     print("=" * 140)
     all_trades_combo = []
     for symbol in symbols:
-        metrics, trades = run_backtest(symbol, db_path, use_h4_filter=True, h4_filter_mode='counter', use_daily_filter=True)
+        metrics, trades = run_backtest(
+            symbol, db_path, strategy=strategy,
+            use_h4_filter=True, h4_filter_mode='counter',
+            use_daily_filter=True
+        )
         if trades:
             all_trades_combo.extend(trades)
 
